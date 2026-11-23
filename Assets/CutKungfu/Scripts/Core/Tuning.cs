@@ -156,7 +156,9 @@ namespace CutKungfu.Core
             // 3〜4個の隙を、敵が詰めてくる時間より長くする。
             CommitByPoseCount = new float4(0.2f, 0.5f, 0.9f, 1.5f),
             CommitScale = 1f,
-            PowerByPoseCount = new float4(1.0f, 1.6f, 2.4f, 3.5f),
+            // 4個は GDD の仮値 3.5 から 2.8 に下げた: 3.5 では範囲技1つで3体を削り、単体技3つで1体ずつとどめを刺して
+            // 包囲を1回で全滅できた(Measure_KnownWipes_CountermeasureGrid で 85%)。2.8 で 0%、前提はすべて保つ
+            PowerByPoseCount = new float4(1.0f, 1.6f, 2.4f, 2.8f),
             CutBaseDamage = 20f,
             CutDashSpeed = 16f,
             CutSegmentMin = 0.14f,
@@ -207,7 +209,7 @@ namespace CutKungfu.Core
             PlayerHitStun = 0.4f,
             PlayerPostHitInvulnerable = 0.6f,
 
-            // 散らして1体1ポーズでは倒しきれず(4個でも84)、1体に集中すれば3ポーズで倒せる(173)。
+            // 散らして1体1ポーズでは倒しきれず(4個でも67.2)、1体に集中すれば3ポーズで倒せる(同じ掌底3発でも100.8)。
             // 「全員を一度に片付けて硬直を踏み倒す」解を消し、置く数の判断を残すための値。
             EnemyMaxHealth = 90f,
             EnemySpeed = 3.2f,
