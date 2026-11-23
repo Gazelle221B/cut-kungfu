@@ -1,5 +1,4 @@
 using CutKungfu.Core;
-using Unity.Burst;
 using Unity.Entities;
 
 namespace CutKungfu.Gameplay
@@ -10,7 +9,7 @@ namespace CutKungfu.Gameplay
     [UpdateInGroup(typeof(InitializationSystemGroup), OrderFirst = true)]
     public partial struct GameplayBootstrapSystem : ISystem
     {
-        [BurstCompile]
+        [Unity.Burst.BurstCompile]
         public void OnCreate(ref SystemState state)
         {
             var em = state.EntityManager;

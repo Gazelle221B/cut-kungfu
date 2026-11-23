@@ -85,16 +85,22 @@ namespace CutKungfu.Presentation
             s.CommitRemaining = cut.CommitRemaining;
             s.CommitDuration = cut.CommitDuration;
 
-            // 今解除したら: 置いた順に辿る時間 + 硬直。その間に殴ってくる敵を「危険」として示す
+            // 今解除したら: 計画した動きの長さ(生成側が決めた Duration)の合計 + 硬直。
+            // その間に殴ってくる敵を「危険」として示す。生成がまだなら置いた距離からの見込みで代える
             var poses = SystemAPI.GetBuffer<PlacedPose>(player);
+            var sources = World.GetOrCreateSystemManaged<CutMotionService>();
             float exec = 0f;
             float3 from = s.PlayerPosition;
             for (int i = 0; i < poses.Length; i++)
             {
-                exec += CutRules.SegmentDuration(tuning, math.distance(from.xz, poses[i].Position.xz));
+                var src = sources.For(poses[i]);
+                exec += src.IsReady(poses[i].MotionHandle)
+                    ? src.Duration(poses[i].MotionHandle)
+                    : CutRules.SegmentDuration(tuning, math.distance(from.xz, poses[i].Position.xz));
                 from = poses[i].Position;
             }
             s.CommitPosition = from;
+            s.PlannedExecution = exec;
             s.RepeatBrickScale = tuning.RepeatBrickScale;
             System.Array.Clear(s.BrickUses, 0, s.BrickUses.Length);
             for (int i = 0; i < poses.Length; i++) s.BrickUses[(int)poses[i].Kind]++;

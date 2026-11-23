@@ -70,6 +70,15 @@ GDD v0.2 の 13章「最初の試作」を、グレーボックス(箱とカプ�
 ## 調整値
 
 `Assets/StreamingAssets/CutKungfu/tuning.json`。**再生中に保存すると1秒以内に反映**される(ビルド後も同じファイルで調整できる)。
+
+プリセットは `Assets/StreamingAssets/CutKungfu/Presets/` にある。使うときは `tuning.json` に上書きコピーする。
+
+| プリセット | 中身 | 4個技の「実行+硬直」 |
+|---|---|---|
+| (既定) | GDD の仮値と試作の調整 | 2.36〜3.32 秒(区間 0.14〜0.38 秒×4 + 硬直 1.8 秒) |
+| `motionbricks-segments.json` | 区間長だけを MotionBricks 想定に(`CutSegmentMin` 0.6 / `CutSegmentMax` 0.9)。他は既定値 | 4.2 秒(区間は置き方によらず 0.6 秒×4 + 硬直 1.8 秒) |
+
+MotionBricks の生成1回は 18〜58 フレーム(30Hz)= 0.6〜1.93 秒。到達距離 7m 未満・突進 16m/s では区間が最短長を下回るので、プリセットでは4区間とも 0.6 秒になる。
 既定値は `Scripts/Core/Tuning.cs` の `Tuning.Default`(GDD の【】仮値)。
 
 ### GDD の仮値から変えたもの
@@ -107,7 +116,14 @@ Editor (シーン生成)
 - **攻撃は要求を積むだけ**: 攻撃側は `DamageRequest` を積み、捌き・無敵・ゲージ・NG理由・ヒットストップは `DamageSystem` が1か所で決める
 - **時間は GameClock に集約**: `Time.timeScale` は使わない。スロー・ヒットストップ・NG の停止はすべて `GameClockSystem`
 - **手応えは出来事で流す**: ロジックは `FeedbackEvent` / `TelemetryEvent` を積むだけ。HUD・効果音・CSV は Presentation が読んで消す
-- **動きの生成は差し替え口**: `Core/CutMotion.cs` は MotionBricks の代わりの仮実装(根の位置と向きだけ補間)。`CutExecutionSystem` は区間(始点・終点・向き・時間)を渡し、位置・回転・接触フレーム・終了を受け取るだけなので、MotionBricks(com.unity.ai.inference で ONNX 推論)が独自の根の回転や接触タイミングを持っていても戦闘側は変わらない
+- **動きの生成は「計画」と「再生」に分かれた差し替え口**(`Core/CutMotion.cs` の `ICutMotionSource`)
+  - 計画: ポーズを置いた時点で `Plan(区間, 文脈)` を呼ぶ。生成はスロー中に進めてよく、結果はすぐ揃わなくてよい(`IsReady`)。文脈 `MotionContext` は今は根の位置と向きだけで、MotionBricks の直近4フレームの関節ポーズは後からフィールドを足す
+  - 再生: 切った後は `Duration`(生成側が決めた長さ)・`ContactTime`(打撃の時刻。終点とは限らない)・`Sample` で辿る。計画時の始点とのずれは区間の中で解消する
+  - 未準備のまま切ったとき: スローのまま「解除待ち」にして配置を締め切る。0.5 秒(実時間)待っても揃わなければ、その区間だけ代替(手続き補間、必ずすぐ揃う)で計画し直して切る
+  - 取り消し・中断・テイクし直しでは計画を捨てる(`Discard`)
+  - 仮実装 `ProceduralCutMotionSource` は計画した瞬間に揃い、従来の補間をそのまま返す(ゲームの挙動は変わらない)
+  - 生成器はワールドごとの `CutMotionService`(更新しない managed システム)が持つ。クラス型の IComponentData は Entities 6.6 で非推奨のため使わない。MotionBricks に差し替えるときは `Primary` を入れ替える
+  - スロー中の足元の帯は「硬直 x 秒(技 y 秒の後)」。y は計画した長さの合計
 - **見た目は一切同梱しない**: 日本語フォントは OS のフォントから実行時に作り、効果音は起動時に波形を合成する
 
 ## 既知の制限(試作の範囲外)

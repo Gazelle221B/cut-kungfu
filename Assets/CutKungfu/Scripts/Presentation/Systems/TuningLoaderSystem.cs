@@ -57,9 +57,8 @@ namespace CutKungfu.Presentation
                 if (!force && write == _lastWrite) return;
                 _lastWrite = write;
 
-                var file = new TuningFile();
-                JsonUtility.FromJsonOverwrite(File.ReadAllText(path), file);
-                SystemAPI.SetSingleton(new TuningSingleton { Value = file.tuning, Version = ++_version });
+                var tuning = Parse(File.ReadAllText(path));
+                SystemAPI.SetSingleton(new TuningSingleton { Value = tuning, Version = ++_version });
                 Debug.Log($"[CutKungfu] 調整値を読み込みました (v{_version}): {path}");
             }
             catch (Exception e)
@@ -68,6 +67,17 @@ namespace CutKungfu.Presentation
                 Debug.LogWarning($"[CutKungfu] 調整値の読み込みに失敗しました。前の値を使います: {e.Message}");
             }
         }
+
+        /// <summary>JSON から調整値を読む。書かれていない項目は既定値のまま。</summary>
+        public static Tuning Parse(string json)
+        {
+            var file = new TuningFile();
+            JsonUtility.FromJsonOverwrite(json, file);
+            return file.tuning;
+        }
+
+        /// <summary>プリセット(StreamingAssets/CutKungfu/Presets/)のパス。使うときは tuning.json に上書きコピーする。</summary>
+        public static string PresetPath(string name) => Path.Combine(Application.streamingAssetsPath, "CutKungfu", "Presets", name + ".json");
 
         /// <summary>調整値を JSON にする。float の誤差表記(0.10000000149…)は人が読む値に丸める。</summary>
         public static string ToJson(in Tuning tuning)

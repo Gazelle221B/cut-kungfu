@@ -34,9 +34,8 @@ namespace CutKungfu.Gameplay
         public int PoseCount;
         public int SegmentIndex;
         public float SegmentTime;
-        public float SegmentDuration;
+        /// <summary>今の区間を実際に始めた位置(計画時の始点とのずれを区間の中で解消する)。</summary>
         public float3 SegmentFrom;
-        public float SegmentFromYaw;
         /// <summary>今の区間の打撃を出したか(接触フレームで一度だけ出す)。</summary>
         public bool StrikeFired;
         public float CommitDuration;
@@ -44,6 +43,11 @@ namespace CutKungfu.Gameplay
 
         /// <summary>このカットの記録(解除〜硬直明けで確定してテレメトリへ流す)。</summary>
         public PlaytestEvent Record;
+
+        /// <summary>解除を受け付けたが、動きの計画が揃うのを待っている(スローのまま)。</summary>
+        public bool ReleasePending;
+        /// <summary>解除待ちの経過(実時間)。</summary>
+        public float ReleaseWaitReal;
 
         /// <summary>このフレームの入力をカット操作が使った(同じ押下で捌き等を出さない)。</summary>
         public bool InputConsumed;
@@ -63,6 +67,10 @@ namespace CutKungfu.Gameplay
         public float Yaw;
         /// <summary>この技の中で、同じブリックを前に何回置いたか(初回 0)。繰り返しの減衰に使う。</summary>
         public int RepeatIndex;
+        /// <summary>置いた時点で計画した、前のポーズ(1個目は自分)からここまでの動き。</summary>
+        public int MotionHandle;
+        /// <summary>本命の生成が間に合わず、代替で計画し直したか。</summary>
+        public bool UsesFallback;
         public Entity Ghost;
     }
 

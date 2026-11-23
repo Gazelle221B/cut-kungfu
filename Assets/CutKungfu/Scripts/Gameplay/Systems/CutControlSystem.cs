@@ -23,6 +23,12 @@ namespace CutKungfu.Gameplay
         static readonly float4 PreviewInvalid = new float4(1f, 0.3f, 0.25f, 0.22f);
         static readonly float4 PlacedColor = new float4(0.6f, 0.95f, 1f, 0.5f);
 
+        /// <summary>
+        /// 解除したのに動きの計画が揃わないとき、スローのまま待つ上限(実時間)。超えたら未準備の区間を代替で作り直す。
+        /// 仮実装(手続き補間)は即座に揃うので、この経路は MotionBricks の非同期推論のためのもの。
+        /// </summary>
+        public const float ReleaseWaitTimeoutReal = 0.5f;
+
         EntityQuery _aliveEnemies;
 
         [BurstCompile]
@@ -34,7 +40,7 @@ namespace CutKungfu.Gameplay
             _aliveEnemies = new EntityQueryBuilder(Allocator.Temp).WithAll<EnemyTag, LocalTransform>().WithNone<Dying>().Build(ref state);
         }
 
-        [BurstCompile]
+        // 動作生成ソース(managed)を呼ぶので Burst にしない
         public void OnUpdate(ref SystemState state)
         {
             var session = SystemAPI.GetSingleton<SessionState>();
@@ -78,10 +84,23 @@ namespace CutKungfu.Gameplay
             {
                 cut.InputConsumed = true; // スロー中の押下は「置く・戻す」であって攻撃・捌きではない
                 cut.SlowRealElapsed += clock.RealDeltaTime;
-                UpdateSlow(ref state, player, ref cut, ref gauge, input, tuning, table, fighter.Facing, playerPos);
+                // 解除待ちの間は配置を締め切る
+                if (!cut.ReleasePending) UpdateSlow(ref state, player, ref cut, ref gauge, input, tuning, table, fighter.Facing, playerPos);
 
                 bool timeUp = cut.SlowRealElapsed >= tuning.SlowMaxRealSeconds;
-                if (input.Cut || timeUp) Release(ref state, player, ref cut, session, tuning, playerPos, fighter.Facing, timeUp);
+                if (!cut.ReleasePending && (input.Cut || timeUp))
+                {
+                    cut.ReleasePending = true;
+                    cut.ReleaseWaitReal = 0f;
+                    cut.Record.TimedOut = timeUp && !input.Cut;
+                }
+                else if (cut.ReleasePending)
+                {
+                    cut.ReleaseWaitReal += clock.RealDeltaTime;
+                }
+
+                if (cut.ReleasePending && PlansReadyOrReplaced(ref state, player, ref cut, tuning, fighter.Facing, playerPos))
+                    Release(ref state, player, ref cut, session, tuning, playerPos);
             }
 
             SystemAPI.SetComponent(player, cut);
@@ -154,7 +173,15 @@ namespace CutKungfu.Gameplay
                     int repeat = 0;
                     for (int i = 0; i < placedPoses.Length; i++)
                         if (placedPoses[i].Kind == cut.SelectedKind) repeat++;
-                    placedPoses.Add(new PlacedPose { Kind = cut.SelectedKind, Position = pos, Yaw = yaw, RepeatIndex = repeat, Ghost = ghost });
+                    // 置いた時点で動きを計画する(スロー中に生成を進め、解除時の待ちを隠す)
+                    float anchorYaw = placedPoses.Length > 0 ? placedPoses[placedPoses.Length - 1].Yaw : CutMotion.YawOf(facing);
+                    int handle = state.World.GetOrCreateSystemManaged<CutMotionService>().Primary.Plan(
+                        CutMotionPlanning.Segment(tuning, anchor, anchorYaw, cut.SelectedKind, pos, yaw),
+                        CutMotionPlanning.Context(anchor, anchorYaw));
+                    placedPoses.Add(new PlacedPose
+                    {
+                        Kind = cut.SelectedKind, Position = pos, Yaw = yaw, RepeatIndex = repeat, MotionHandle = handle, Ghost = ghost,
+                    });
                     Feedback(ref state, FeedbackKind.PosePlaced, pos, placed + 1);
                     placed++;
                     // 置いた直後は次のアンカーで判定し直す
@@ -169,6 +196,7 @@ namespace CutKungfu.Gameplay
             else if (input.Secondary && placed > 0)
             {
                 var last = poses[placed - 1];
+                state.World.GetOrCreateSystemManaged<CutMotionService>().For(last).Discard(last.MotionHandle);
                 poses.RemoveAt(placed - 1);
                 if (state.EntityManager.Exists(last.Ghost)) state.EntityManager.DestroyEntity(last.Ghost);
                 gauge.Add(tuning.CostPerPose);
@@ -225,11 +253,37 @@ namespace CutKungfu.Gameplay
             }
         }
 
-        void Release(ref SystemState state, Entity player, ref CutState cut, in SessionState session, in Tuning tuning, float3 playerPos,
-            float3 facing, bool timedOut)
+        /// <summary>
+        /// 解除してよいか。計画が揃っていれば true。揃っていなければ待ち、待ちの上限を超えたら
+        /// 未準備の区間を代替(必ずすぐ準備できる)で計画し直して true を返す。
+        /// </summary>
+        bool PlansReadyOrReplaced(ref SystemState state, Entity player, ref CutState cut, in Tuning tuning, float3 facing, float3 playerPos)
+        {
+            var sources = state.World.GetOrCreateSystemManaged<CutMotionService>();
+            var poses = SystemAPI.GetBuffer<PlacedPose>(player);
+            if (sources.AllReady(poses)) return true;
+            if (cut.ReleaseWaitReal < ReleaseWaitTimeoutReal) return false;
+
+            for (int i = 0; i < poses.Length; i++)
+            {
+                var p = poses[i];
+                if (sources.For(p).IsReady(p.MotionHandle)) continue;
+                sources.For(p).Discard(p.MotionHandle);
+                float3 from = i > 0 ? poses[i - 1].Position : playerPos;
+                float fromYaw = i > 0 ? poses[i - 1].Yaw : CutMotion.YawOf(facing);
+                p.MotionHandle = sources.Fallback.Plan(
+                    CutMotionPlanning.Segment(tuning, from, fromYaw, p.Kind, p.Position, p.Yaw),
+                    CutMotionPlanning.Context(from, fromYaw));
+                p.UsesFallback = true;
+                poses[i] = p;
+            }
+            return true;
+        }
+
+        void Release(ref SystemState state, Entity player, ref CutState cut, in SessionState session, in Tuning tuning, float3 playerPos)
         {
             cut.Record.SlowSeconds = cut.SlowRealElapsed;
-            cut.Record.TimedOut = timedOut;
+            cut.ReleasePending = false;
             var em = state.EntityManager;
             if (cut.Preview != Entity.Null && em.Exists(cut.Preview)) em.DestroyEntity(cut.Preview);
             cut.Preview = Entity.Null;
@@ -249,9 +303,7 @@ namespace CutKungfu.Gameplay
             cut.SegmentIndex = 0;
             cut.SegmentTime = 0f;
             cut.SegmentFrom = playerPos;
-            cut.SegmentFromYaw = CutMotion.YawOf(facing);
             cut.StrikeFired = false;
-            cut.SegmentDuration = CutRules.SegmentDuration(tuning, math.distance(playerPos.xz, poses[0].Position.xz));
             cut.CommitDuration = CutRules.CommitTime(tuning, cut.PoseCount, session.CommitEnabled);
             cut.Record.Poses = cut.PoseCount;
             cut.Record.CommitTime = cut.CommitDuration;

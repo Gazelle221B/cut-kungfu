@@ -37,6 +37,8 @@ namespace CutKungfu.Tests
                          typeof(BodyMotionSystem), typeof(DyingSystem), typeof(StrikeFxSystem), typeof(CharacterColorSystem),
                      })
                 gameplay.AddSystemToUpdateList(World.CreateSystem(t));
+            // 動作生成の差し替え口(更新しない managed システム)。テストはここで差し替えられる
+            World.GetOrCreateSystemManaged<CutMotionService>();
             sim.SortSystems();
             init.SortSystems();
 

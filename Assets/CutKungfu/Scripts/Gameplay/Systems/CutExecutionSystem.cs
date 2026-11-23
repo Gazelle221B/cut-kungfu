@@ -8,8 +8,8 @@ using Unity.Transforms;
 namespace CutKungfu.Gameplay
 {
     /// <summary>
-    /// 「切る」: 置いたポーズを順に辿り、接触フレームごとに1打を出す。最後のポーズの後はコミット時間だけ動けない。
-    /// 動きの生成は <see cref="CutMotion"/>(MotionBricks の差し替え口)に任せ、ここは区間の進行・判定・中断だけを持つ。
+    /// 「切る」: 置いたときに計画した動き(<see cref="ICutMotionSource"/>)を順に再生し、接触の時刻に1打を出す。
+    /// 区間の長さと接触の時刻は生成側が決める。最後の区間の後はコミット時間だけ動けない。
     /// </summary>
     [UpdateInGroup(typeof(GameplaySystemGroup))]
     [UpdateAfter(typeof(CutControlSystem))]
@@ -22,7 +22,7 @@ namespace CutKungfu.Gameplay
             state.RequireForUpdate<SessionState>();
         }
 
-        [BurstCompile]
+        // 動作生成ソース(managed)を呼ぶので Burst にしない
         public void OnUpdate(ref SystemState state)
         {
             if (SystemAPI.GetSingleton<SessionState>().Phase != SessionPhase.Playing) return;
@@ -34,6 +34,7 @@ namespace CutKungfu.Gameplay
             var tuning = SystemAPI.GetSingleton<TuningSingleton>().Value;
             float dt = SystemAPI.GetSingleton<GameClock>().DeltaTime;
             var fighter = SystemAPI.GetComponent<Fighter>(player);
+            var sources = state.World.GetOrCreateSystemManaged<CutMotionService>();
             var toDestroy = new NativeList<Entity>(4, Allocator.Temp);
 
             if (cut.Phase == CutPhase.Executing && fighter.HitStun > 0f)
@@ -42,17 +43,17 @@ namespace CutKungfu.Gameplay
                 var poses = SystemAPI.GetBuffer<PlacedPose>(player);
                 for (int i = cut.SegmentIndex; i < poses.Length; i++) toDestroy.Add(poses[i].Ghost);
                 cut.Record.Interrupted = true;
-                Finish(ref state, player, ref cut);
+                Finish(ref state, player, ref cut, sources);
             }
             else if (cut.Phase == CutPhase.Executing)
             {
-                Advance(ref state, player, ref cut, ref fighter, tuning, dt, ref toDestroy);
+                Advance(ref state, player, ref cut, ref fighter, tuning, dt, sources, ref toDestroy);
                 SystemAPI.SetComponent(player, fighter);
             }
             else
             {
                 cut.CommitRemaining -= dt;
-                if (cut.CommitRemaining <= 0f) Finish(ref state, player, ref cut);
+                if (cut.CommitRemaining <= 0f) Finish(ref state, player, ref cut, sources);
             }
 
             SystemAPI.SetComponent(player, cut);
@@ -61,49 +62,41 @@ namespace CutKungfu.Gameplay
         }
 
         void Advance(ref SystemState state, Entity player, ref CutState cut, ref Fighter fighter, in Tuning tuning, float dt,
-            ref NativeList<Entity> toDestroy)
+            CutMotionService sources, ref NativeList<Entity> toDestroy)
         {
             var poses = SystemAPI.GetBuffer<PlacedPose>(player);
             var pose = poses[cut.SegmentIndex];
-            var brick = tuning.GetBrick(pose.Kind);
+            var source = sources.For(pose);
+            int handle = pose.MotionHandle;
+            float duration = source.Duration(handle);
             cut.SegmentTime += dt;
 
-            var sample = CutMotion.Sample(new MotionSegment
-            {
-                From = cut.SegmentFrom,
-                FromYaw = cut.SegmentFromYaw,
-                To = pose.Position,
-                ToYaw = pose.Yaw,
-                ArcHeight = brick.ArcHeight,
-                Duration = cut.SegmentDuration,
-            }, cut.SegmentTime);
+            // 計画した始点と、実際に区間を始めた位置のずれ(スロー中の押し合いなど)を区間の中で解消する
+            var sample = source.Sample(handle, cut.SegmentTime);
+            float3 drift = cut.SegmentFrom - source.Sample(handle, 0f).Position;
+            float progress = duration > 1e-5f ? math.saturate(cut.SegmentTime / duration) : 1f;
 
             var lt = SystemAPI.GetComponent<LocalTransform>(player);
-            lt.Position = sample.Position;
+            lt.Position = sample.Position + drift * (1f - progress);
             lt.Rotation = sample.Rotation;
             SystemAPI.SetComponent(player, lt);
             fighter.Facing = math.mul(sample.Rotation, new float3(0, 0, 1));
 
-            if (sample.Contact && !cut.StrikeFired)
+            if (!cut.StrikeFired && cut.SegmentTime >= source.ContactTime(handle))
             {
                 cut.StrikeFired = true;
-                Strike(ref state, player, cut, pose, brick, tuning, fighter.Facing);
+                Strike(ref state, player, cut, pose, tuning.GetBrick(pose.Kind), tuning, lt.Position, fighter.Facing);
                 toDestroy.Add(pose.Ghost);
             }
 
-            if (!sample.Finished) return;
+            if (cut.SegmentTime < duration) return;
 
+            source.Discard(handle);
             cut.SegmentIndex++;
             cut.StrikeFired = false;
-            if (cut.SegmentIndex < cut.PoseCount)
-            {
-                var next = poses[cut.SegmentIndex];
-                cut.SegmentFrom = pose.Position;
-                cut.SegmentFromYaw = pose.Yaw;
-                cut.SegmentTime = 0f;
-                cut.SegmentDuration = CutRules.SegmentDuration(tuning, math.distance(pose.Position.xz, next.Position.xz));
-            }
-            else
+            cut.SegmentTime = 0f;
+            cut.SegmentFrom = lt.Position;
+            if (cut.SegmentIndex >= cut.PoseCount)
             {
                 cut.Phase = CutPhase.Commit;
                 // 硬直 0 秒(条件 B)でも記録の確定は次の更新で行う(最後の1打の撃破数・映え点を DamageSystem が書き込むため)。
@@ -112,9 +105,10 @@ namespace CutKungfu.Gameplay
             }
         }
 
-        void Strike(ref SystemState state, Entity player, in CutState cut, in PlacedPose pose, in BrickTuning brick, in Tuning tuning, float3 facing)
+        void Strike(ref SystemState state, Entity player, in CutState cut, in PlacedPose pose, in BrickTuning brick, in Tuning tuning,
+            float3 at, float3 facing)
         {
-            float2 center = pose.Position.xz + facing.xz * brick.StrikeForward;
+            float2 center = at.xz + facing.xz * brick.StrikeForward;
             bool found = NearestEnemy(ref state, center, out float2 nearest);
             center = CutRules.AssistStrikeCenter(center, brick.StrikeRadius, tuning.StrikeAssist, nearest, found);
             SystemAPI.GetSingletonBuffer<DamageRequest>().Add(new DamageRequest
@@ -134,8 +128,8 @@ namespace CutKungfu.Gameplay
             });
         }
 
-        /// <summary>カットを終えて記録を確定し、置いたポーズを片付ける。</summary>
-        void Finish(ref SystemState state, Entity player, ref CutState cut)
+        /// <summary>カットを終えて記録を確定し、置いたポーズと残った計画を片付ける。</summary>
+        void Finish(ref SystemState state, Entity player, ref CutState cut, CutMotionService sources)
         {
             SystemAPI.GetSingletonBuffer<TelemetryEvent>().Add(new TelemetryEvent { Value = cut.Record });
             float3 pos = SystemAPI.GetComponent<LocalTransform>(player).Position;
@@ -143,7 +137,9 @@ namespace CutKungfu.Gameplay
             {
                 Kind = FeedbackKind.CommitEnd, Position = pos, Value = cut.Record.Hae, Extra = cut.Record.Kills,
             });
-            SystemAPI.GetBuffer<PlacedPose>(player).Clear();
+            var poses = SystemAPI.GetBuffer<PlacedPose>(player);
+            sources.Discard(poses, math.min(cut.SegmentIndex, poses.Length));
+            poses.Clear();
             cut = new CutState { SelectedKind = cut.SelectedKind };
         }
 
