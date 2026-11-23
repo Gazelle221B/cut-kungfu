@@ -63,6 +63,13 @@ namespace CutKungfu.Gameplay
                     continue;
                 }
 
+                // 技の打撃を受けた敵: 硬直が明けたら、残っていた待ちに倍率を掛ける(戻り中なら新しい待ちを引くときに掛ける)
+                if (brain.HitByCut && brain.State == EnemyState.Approach)
+                {
+                    brain.Cooldown *= tuning.EnemyWaitScaleAfterCutHit;
+                    brain.HitByCut = false;
+                }
+
                 switch (brain.State)
                 {
                     case EnemyState.Approach:
@@ -111,6 +118,11 @@ namespace CutKungfu.Gameplay
                         {
                             brain.State = EnemyState.Approach;
                             brain.Cooldown = brain.Random.NextFloat(tuning.EnemyCooldownMin, tuning.EnemyCooldownMax);
+                            if (brain.HitByCut)
+                            {
+                                brain.Cooldown *= tuning.EnemyWaitScaleAfterCutHit;
+                                brain.HitByCut = false;
+                            }
                         }
                         break;
 

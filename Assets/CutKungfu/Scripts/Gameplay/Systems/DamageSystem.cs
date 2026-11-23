@@ -84,6 +84,8 @@ namespace CutKungfu.Gameplay
                 f.Health -= damage;
                 f.Flash = 0.12f;
                 f.HitStun = math.max(f.HitStun, hitStun);
+                if (isCut && SystemAPI.HasComponent<EnemyBrain>(entity))
+                    SystemAPI.GetComponentRW<EnemyBrain>(entity).ValueRW.HitByCut = true;
                 kbRef.ValueRW.Velocity = Push(req, p) * req.Knockback;
                 hitStop.Request(req.HitStop);
                 shake.Add(isCut ? 0.35f : 0.12f);

@@ -117,6 +117,12 @@ namespace CutKungfu.Core
         /// 被弾硬直は予備動作を潰すので、これを短くすると、範囲技で削った敵が技の途中で殴り返せる。
         /// </summary>
         public float EnemyAreaHitStun;
+        /// <summary>
+        /// 技で打撃を受けた敵が、被弾硬直のあとに取る「次の予備動作までの待ち」に掛ける倍率(1=従来、0=待たずに予備動作へ)。
+        /// 予備動作を潰された敵は戻りのあとに引く新しい待ちに、接近中だった敵は残っていた待ちに掛かる。
+        /// 同時に予備動作に入れる数(EnemyMaxConcurrentWindups)の制限はそのまま。
+        /// </summary>
+        public float EnemyWaitScaleAfterCutHit;
         public float EnemyStaggerOnParry;
         public int EnemyMaxConcurrentWindups;
 
@@ -226,6 +232,7 @@ namespace CutKungfu.Core
             EnemyHitStun = 0.3f,
             EnemyCutHitStun = 0.8f,
             EnemyAreaHitStun = 0.8f,
+            EnemyWaitScaleAfterCutHit = 1f,
             EnemyStaggerOnParry = 1.2f,
             EnemyMaxConcurrentWindups = 2,
 
