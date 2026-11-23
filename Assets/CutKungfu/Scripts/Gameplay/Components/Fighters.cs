@@ -85,6 +85,8 @@ namespace CutKungfu.Gameplay
         public float Cooldown;
 
         public Unity.Mathematics.Random Random;
+        /// <summary>技の打撃を受けた。被弾硬直のあと、次の待ちに EnemyWaitScaleAfterCutHit を掛けて消す。</summary>
+        public bool HitByCut;
 
         /// <summary>
         /// 次に殴ってくるまでの最短の見込み(ゲーム秒)。HUD とテレメトリ用。
