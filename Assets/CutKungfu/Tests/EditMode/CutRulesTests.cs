@@ -184,12 +184,23 @@ namespace CutKungfu.Tests
         }
 
         [Test]
+        public void AreaCap_CoversAreaBricks_AndBystandersOfThePathSweep()
+        {
+            var t = T;
+            Assert.That(CutRules.CountsTowardAreaCap(t, BrickKind.Spin, isAimedTarget: true), Is.True);
+            Assert.That(CutRules.CountsTowardAreaCap(t, BrickKind.TableLanding, isAimedTarget: false), Is.True);
+            Assert.That(CutRules.CountsTowardAreaCap(t, BrickKind.FlyingKick, isAimedTarget: false), Is.True, "経路で巻き込んだ敵は対象");
+            Assert.That(CutRules.CountsTowardAreaCap(t, BrickKind.FlyingKick, isAimedTarget: true), Is.False, "到達点で狙った敵は対象外");
+            Assert.That(CutRules.CountsTowardAreaCap(t, BrickKind.Palm, isAimedTarget: false), Is.False);
+        }
+
+        [Test]
         public void AreaBricks_AreSpinAndTableLanding()
         {
             Assert.That(CutRules.IsAreaBrick(BrickKind.Spin), Is.True);
             Assert.That(CutRules.IsAreaBrick(BrickKind.TableLanding), Is.True);
             Assert.That(CutRules.IsAreaBrick(BrickKind.Palm), Is.False);
-            Assert.That(CutRules.IsAreaBrick(BrickKind.FlyingKick), Is.False, "飛び蹴りの経路判定は(まだ)含めない");
+            Assert.That(CutRules.IsAreaBrick(BrickKind.FlyingKick), Is.False, "飛び蹴りは範囲技ではない(巻き込みだけが上限の対象: CountsTowardAreaCap)");
         }
     }
 }

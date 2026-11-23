@@ -109,6 +109,15 @@ namespace CutKungfu.Core
         public static bool IsAreaBrick(BrickKind kind) => kind == BrickKind.Spin || kind == BrickKind.TableLanding;
 
         /// <summary>
+        /// 範囲技の上限(1回の技で同じ敵に与える合計)の対象になる打撃か。
+        /// 範囲技(回し蹴り・机上の着地)はすべて。経路も判定になる技(飛び蹴り)は、経路で巻き込んだ敵だけで、
+        /// 到達点で狙った敵への打撃は対象外(弱った敵へのとどめを残す)。
+        /// </summary>
+        /// <param name="isAimedTarget">到達点で狙った敵(命中補正の相手)への打撃か。</param>
+        public static bool CountsTowardAreaCap(in Tuning t, BrickKind kind, bool isAimedTarget)
+            => IsAreaBrick(kind) || (t.GetBrick(kind).SweepPath && !isAimedTarget);
+
+        /// <summary>
         /// 範囲技の1打で、実際に与えるダメージ。この技ですでにその敵へ範囲技で与えた量(alreadyTaken)と合わせて、
         /// 最大体力 × <see cref="Tuning.AreaDamageCapRatio"/> を超えないよう削る。削ったら capped = true。
         /// </summary>

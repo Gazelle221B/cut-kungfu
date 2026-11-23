@@ -66,15 +66,20 @@ namespace CutKungfu.Tests
             public string Name;
             public float3 Player;
             public float[] EnemyAngles;
+            /// <summary>
+            /// 既知の問題(範囲技+単体技): ゲージ60(4個技)で、範囲技1発で3体を削り、残る単体技3発で1体ずつとどめを刺すと全滅できる
+            /// (机の左脇 2通り、机の手前 3通り)。範囲技の上限の対象外の打撃で起きるため、直し方の判断待ち。
+            /// </summary>
+            public bool KnownWipeByAreaThenThreeFinishers;
             public override string ToString() => Name;
         }
 
         static readonly SurroundSetup[] Setups =
         {
             // 机(x 1.8〜4.2, z 0.2〜1.4)の左脇。机上の着地の範囲(半径2.0)に3体とも入る
-            new SurroundSetup { Name = "机の左脇", Player = new float3(1.2f, 0f, 0.8f), EnemyAngles = new[] { 90f, 210f, 330f } },
+            new SurroundSetup { Name = "机の左脇", Player = new float3(1.2f, 0f, 0.8f), EnemyAngles = new[] { 90f, 210f, 330f }, KnownWipeByAreaThenThreeFinishers = true },
             // 机の手前。机の上からは手前の1体に届きにくい
-            new SurroundSetup { Name = "机の手前", Player = new float3(3f, 0f, -1.0f), EnemyAngles = new[] { 180f, 270f, 0f } },
+            new SurroundSetup { Name = "机の手前", Player = new float3(3f, 0f, -1.0f), EnemyAngles = new[] { 180f, 270f, 0f }, KnownWipeByAreaThenThreeFinishers = true },
             // 机に届かない(到達6mの外)。机上の着地は置けない
             new SurroundSetup { Name = "机に届かない", Player = new float3(-6f, 0f, 0f), EnemyAngles = new[] { 90f, 210f, 330f } },
         };
@@ -143,18 +148,22 @@ namespace CutKungfu.Tests
         {
             foreach (var setup in Setups)
             foreach (var gauge in new[] { 50f, 60f })
-                yield return new TestCaseData(setup, gauge).SetName($"Measure_AreaThenPalmFinish({setup.Name}, ゲージ{gauge})");
+            {
+                var data = new TestCaseData(setup, gauge).SetName($"AreaThenPalmFinish_CannotWipeTheSurround({setup.Name}, ゲージ{gauge})");
+                if (setup.KnownWipeByAreaThenThreeFinishers && gauge >= 60f)
+                    data = data.Ignore("既知の問題: 範囲技1発+単体技3発で全滅できる(机の左脇2通り・机の手前3通り、PR #1 で報告済み)。直し方が決まったら外す");
+                yield return data;
+            }
         }
 
         /// <summary>
-        /// 計測用(通常は走らせない): 範囲技で削って掌底でとどめを刺す並び。倒せるのは想定どおりなので合否は付けず、
-        /// 3体全滅の可否と残り体力を記録する。並びは {回し蹴り, 机上の着地, 飛び蹴り, 掌底} の2〜4個で、
+        /// 範囲技で削って単体技(掌底・飛び蹴り)でとどめを刺す並び。1〜2体を倒すのは想定どおりで許容し、
+        /// 1回の技で3体全滅できないことだけを確かめる。並びは {回し蹴り, 机上の着地, 飛び蹴り, 掌底} の2〜4個で、
         /// 掌底と範囲技(回し蹴りか机上の着地)を少なくとも1つずつ含むもの。
         /// 掌底は狙う敵の手前(自分側へ 0.7m)に置き、敵を順に狙う。
         /// </summary>
-        [Explicit("計測用: 範囲技+掌底の全滅の可否を記録する(合否なし)")]
         [TestCaseSource(nameof(PalmMixedCases))]
-        public void Measure_AreaThenPalmFinish(SurroundSetup setup, float gauge)
+        public void AreaThenPalmFinish_CannotWipeTheSurround(SurroundSetup setup, float gauge)
         {
             var table = GameplayTestWorld.StageTable;
             int affordable = CutRules.AffordablePoses(Tuning.Default, gauge - Tuning.Default.SlowFixedCost, 0);
@@ -222,8 +231,8 @@ namespace CutKungfu.Tests
                              + (runs > survivors[0] ? $" / 全滅しなかった中で残り体力の合計の最小 {minRemainingWhenNotWiped:0.0}" : "")
                              + (wipes.Count > 0 ? "\n全滅:\n" + string.Join("\n", wipes) : "");
             TestContext.WriteLine(summary);
-            UnityEngine.Debug.Log("[MEASURE] " + summary);
-            Assert.Pass(summary);
+            Assert.That(runs, Is.GreaterThan(0));
+            Assert.That(wipes, Is.Empty, "1回の技で包囲を全滅できる並び:\n" + summary);
         }
 
         static GameplayTestWorld SurroundedAt(SurroundSetup setup) => new GameplayTestWorld(setup.Player, EnemySpawns(setup));
@@ -281,6 +290,31 @@ namespace CutKungfu.Tests
             Assert.That(cappedFeedback, Is.True, "上限に掛かった打撃はプレイヤーに分かる出来事として出る");
             Assert.That(w.Em.GetComponentData<CutState>(w.Player).Record.AreaCapHits, Is.GreaterThan(0));
             Assert.That(w.AliveEnemies(), Is.GreaterThan(0));
+        }
+
+        /// <summary>
+        /// 飛び蹴りは、到達点で狙った敵への打撃は上限の対象外。体力の減った単体の敵には、
+        /// 1発で(範囲技で上限まで削った後でも)とどめを刺せる。
+        /// </summary>
+        [TestCase("飛び蹴り1発で、体力15の敵を倒す", 15f, 50f, new[] { F })]
+        [TestCase("回し蹴り×3で上限(72)まで削ってから、飛び蹴りでとどめ", 90f, 60f, new[] { S, S, S, F })]
+        public void FlyingKick_FinishesAWeakenedSingleEnemy(string label, float enemyHealth, float gauge, BrickKind[] bricks)
+        {
+            float3 enemyAt = new float3(2.5f, 0f, 0f);
+            using var w = new GameplayTestWorld(float3.zero, enemyAt);
+            w.Step();
+            w.SetGauge(gauge);
+            var enemy = w.Enemies()[0];
+            var f = w.Em.GetComponentData<Fighter>(enemy);
+            f.Health = enemyHealth;
+            w.Em.SetComponentData(enemy, f);
+
+            var poses = new (BrickKind, float3)[bricks.Length];
+            for (int i = 0; i < bricks.Length; i++) poses[i] = (bricks[i], bricks[i] == F ? enemyAt : float3.zero);
+            w.PerformCut(poses);
+            for (int i = 0; i < 300 && w.Em.GetComponentData<CutState>(w.Player).Phase == CutPhase.Executing; i++) w.Step();
+
+            Assert.That(w.AliveEnemies(), Is.Zero, label);
         }
 
         [Test]
