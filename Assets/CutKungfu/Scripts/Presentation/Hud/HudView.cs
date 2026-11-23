@@ -311,27 +311,59 @@ namespace CutKungfu.Presentation
         {
             _stats.EnableInClassList("stats--visible", stats != null);
             if (stats == null) return;
-            _sb.Clear();
-            _sb.Append("平均ポーズ数 (サンプル数)\n");
-            _sb.Append("            敵1     敵2     敵3+\n");
-            for (int c = 1; c >= 0; c--)
+            _statsGrid ??= BuildStatsGrid();
+
+            // 行: 条件(硬直あり/なし) × 列: 包囲人数。値は「平均ポーズ数 (サンプル数)」
+            for (int row = 0; row < 2; row++)
             {
-                bool commit = c == 1;
-                _sb.Append(commit ? "硬直あり  " : "硬直なし  ");
+                bool commit = row == 0;
                 for (int b = 0; b < PlaytestStats.Buckets; b++)
                 {
-                    if (stats.TryAveragePoses(commit, b, out float avg))
-                        _sb.Append($"{avg:0.00}({stats.CutCount(commit, b)})  ");
-                    else
-                        _sb.Append("  -       ");
+                    _statsGrid[row, b].text = stats.TryAveragePoses(commit, b, out float avg)
+                        ? $"{avg:0.00} ({stats.CutCount(commit, b)})"
+                        : "—";
                 }
-                _sb.Append('\n');
             }
-            _sb.Append($"\nスロー使用  あり {stats.SlowUses(true)} / なし {stats.SlowUses(false)}");
-            _sb.Append($"\nNG          あり {stats.NgCount(true)} / なし {stats.NgCount(false)}");
-            _sb.Append($"\n硬直中の被弾 あり {stats.HitsDuringCommit(true)}");
-            if (!string.IsNullOrEmpty(logPath)) _sb.Append($"\n\n記録: {logPath}");
+
+            _sb.Clear();
+            _sb.Append($"スロー使用: あり {stats.SlowUses(true)} / なし {stats.SlowUses(false)}\n");
+            _sb.Append($"NG: あり {stats.NgCount(true)} / なし {stats.NgCount(false)}\n");
+            _sb.Append($"硬直中の被弾: {stats.HitsDuringCommit(true)}");
+            if (!string.IsNullOrEmpty(logPath)) _sb.Append($"\n記録: {logPath}");
             _statsBody.text = _sb.ToString();
+        }
+
+        Label[,] _statsGrid;
+
+        Label[,] BuildStatsGrid()
+        {
+            var grid = new Label[2, PlaytestStats.Buckets];
+            var table = new VisualElement { pickingMode = PickingMode.Ignore };
+            table.AddToClassList("stats__table");
+            table.Add(StatsRow("平均ポーズ数", new[] { "敵1", "敵2", "敵3+" }, null, 0));
+            table.Add(StatsRow("硬直あり", null, grid, 0));
+            table.Add(StatsRow("硬直なし", null, grid, 1));
+            _stats.Insert(1, table);
+            return grid;
+        }
+
+        static VisualElement StatsRow(string head, string[] fixedCells, Label[,] grid, int gridRow)
+        {
+            var row = new VisualElement { pickingMode = PickingMode.Ignore };
+            row.AddToClassList("stats__row");
+            var h = new Label(head);
+            h.AddToClassList("stats__cell");
+            h.AddToClassList("stats__cell--head");
+            row.Add(h);
+            for (int b = 0; b < PlaytestStats.Buckets; b++)
+            {
+                var cell = new Label(fixedCells != null ? fixedCells[b] : "—");
+                cell.AddToClassList("stats__cell");
+                if (fixedCells != null) cell.AddToClassList("stats__cell--caption");
+                else grid[gridRow, b] = cell;
+                row.Add(cell);
+            }
+            return row;
         }
 
         static void Place(VisualElement e, IPanel panel, Camera cam, Vector3 world)

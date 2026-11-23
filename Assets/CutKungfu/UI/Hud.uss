@@ -246,3 +246,10 @@
 }
 .film-strip__frame--spent { background-color: rgba(255, 90, 60, 0.2); }
 .film-strip__label { font-size: 13px; color: var(--cream); margin-left: 5px; -unity-font-style: bold; }
+
+/* --- 集計の表(比例フォントでも列が揃うよう固定幅のセル) --- */
+.stats__table { margin-bottom: 8px; }
+.stats__row { flex-direction: row; }
+.stats__cell { width: 78px; font-size: 14px; -unity-text-align: middle-right; }
+.stats__cell--head { width: 110px; -unity-text-align: middle-left; color: var(--mustard); }
+.stats__cell--caption { color: var(--teal); }
