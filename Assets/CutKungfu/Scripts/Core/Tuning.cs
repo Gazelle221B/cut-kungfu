@@ -55,6 +55,8 @@ namespace CutKungfu.Core
         public float CutDashSpeed;
         public float CutSegmentMin;
         public float CutSegmentMax;
+        /// <summary>打点を近くの敵へ寄せる最大距離[m](GDD 15章「拳が敵に当たらない」への補正層)。0 で無効。</summary>
+        public float StrikeAssist;
         public bool InvulnerableDuringSlow;
         public bool InvulnerableDuringExecution;
 
@@ -137,6 +139,7 @@ namespace CutKungfu.Core
             CutDashSpeed = 16f,
             CutSegmentMin = 0.14f,
             CutSegmentMax = 0.38f,
+            StrikeAssist = 1.2f,
             InvulnerableDuringSlow = true,
             InvulnerableDuringExecution = true,
 
@@ -168,7 +171,7 @@ namespace CutKungfu.Core
             AttackRecovery = 0.2f,
             AttackRadius = 0.85f,
             AttackForward = 0.85f,
-            AttackDamage = 8f,
+            AttackDamage = 10f,
             AttackKnockback = 3.5f,
             ParryWindow = 0.18f,
             ParryRecovery = 0.25f,
@@ -178,7 +181,9 @@ namespace CutKungfu.Core
             PlayerHitStun = 0.4f,
             PlayerPostHitInvulnerable = 0.6f,
 
-            EnemyMaxHealth = 30f,
+            // 散らして1体1ポーズでは倒しきれず(4個でも84)、1体に集中すれば3ポーズで倒せる(173)。
+            // 「全員を一度に片付けて硬直を踏み倒す」解を消し、置く数の判断を残すための値。
+            EnemyMaxHealth = 90f,
             EnemySpeed = 2.4f,
             EnemyRadius = 0.42f,
             EnemyEngageRange = 1.35f,

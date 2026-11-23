@@ -309,7 +309,7 @@ namespace CutKungfu.EditorTools
             vignette.smoothness.Override(0.5f);
             var grain = profile.Add<FilmGrain>(true);
             grain.type.Override(FilmGrainLookup.Medium3);
-            grain.intensity.Override(0.7f);
+            grain.intensity.Override(0.45f);
             var ca = profile.Add<ChromaticAberration>(true);
             ca.intensity.Override(0.25f);
             foreach (var c in profile.components) AssetDatabase.AddObjectToAsset(c, profile);

@@ -53,6 +53,8 @@ namespace CutKungfu.Gameplay
                 if (t >= 1f)
                 {
                     float2 center = pose.Position.xz + fighter.Facing.xz * brick.StrikeForward;
+                    bool found = NearestEnemy(ref state, center, out float2 nearest);
+                    center = CutRules.AssistStrikeCenter(center, brick.StrikeRadius, tuning.StrikeAssist, nearest, found);
                     SystemAPI.GetSingletonBuffer<DamageRequest>().Add(new DamageRequest
                     {
                         Attacker = player,
@@ -105,6 +107,18 @@ namespace CutKungfu.Gameplay
             SystemAPI.SetComponent(player, cut);
             if (ghostToRemove != Entity.Null && state.EntityManager.Exists(ghostToRemove))
                 state.EntityManager.DestroyEntity(ghostToRemove);
+        }
+
+        bool NearestEnemy(ref SystemState state, float2 from, out float2 nearest)
+        {
+            nearest = default;
+            float best = float.MaxValue;
+            foreach (var lt in SystemAPI.Query<RefRO<LocalTransform>>().WithAll<EnemyTag>().WithNone<Dying>())
+            {
+                float d = math.distancesq(lt.ValueRO.Position.xz, from);
+                if (d < best) { best = d; nearest = lt.ValueRO.Position.xz; }
+            }
+            return best < float.MaxValue;
         }
     }
 }

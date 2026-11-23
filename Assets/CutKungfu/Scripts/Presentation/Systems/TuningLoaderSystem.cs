@@ -69,6 +69,12 @@ namespace CutKungfu.Presentation
             }
         }
 
-        public static string ToJson(in Tuning tuning) => JsonUtility.ToJson(new TuningFile { tuning = tuning }, prettyPrint: true);
+        /// <summary>調整値を JSON にする。float の誤差表記(0.10000000149…)は人が読む値に丸める。</summary>
+        public static string ToJson(in Tuning tuning)
+        {
+            string json = JsonUtility.ToJson(new TuningFile { tuning = tuning }, prettyPrint: true);
+            return System.Text.RegularExpressions.Regex.Replace(json, @"-?\d+\.\d{5,}", m =>
+                float.Parse(m.Value, System.Globalization.CultureInfo.InvariantCulture).ToString(System.Globalization.CultureInfo.InvariantCulture));
+        }
     }
 }

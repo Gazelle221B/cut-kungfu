@@ -178,6 +178,7 @@ namespace CutKungfu.Gameplay
                     Kind = PlaytestEventKind.PlayerHit,
                     Time = clock.ElapsedReal,
                     Wave = session.WaveIndex,
+                    FormationEnemies = FormationSize(ref state, session.WaveIndex),
                     Take = session.Take,
                     CommitEnabled = session.CommitEnabled,
                     Poses = duringCommit ? cut.PoseCount : 0,
@@ -186,6 +187,12 @@ namespace CutKungfu.Gameplay
                     PlayerHealth = f.Health,
                 },
             });
+        }
+
+        int FormationSize(ref SystemState state, int wave)
+        {
+            var waves = SystemAPI.GetSingletonBuffer<ScenarioWave>(true);
+            return wave >= 0 && wave < waves.Length ? waves[wave].SpawnCount : 0;
         }
 
         static float3 Push(in DamageRequest req, float2 target)

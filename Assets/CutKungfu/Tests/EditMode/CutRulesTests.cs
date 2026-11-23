@@ -109,5 +109,35 @@ namespace CutKungfu.Tests
             Assert.That(CutRules.SegmentDuration(T, 0f), Is.EqualTo(T.CutSegmentMin));
             Assert.That(CutRules.SegmentDuration(T, 100f), Is.EqualTo(T.CutSegmentMax));
         }
+
+        [Test]
+        public void StrikeAssist_PullsTowardNearbyEnemy_ButNotFarOnes()
+        {
+            var c = new float2(0f, 0f);
+            var near = CutRules.AssistStrikeCenter(c, 1f, 1.2f, new float2(1.5f, 0f), true);
+            Assert.That(near.x, Is.EqualTo(1.2f).Within(1e-5f));
+            var far = CutRules.AssistStrikeCenter(c, 1f, 1.2f, new float2(5f, 0f), true);
+            Assert.That(far.x, Is.Zero);
+            Assert.That(CutRules.AssistStrikeCenter(c, 1f, 0f, new float2(1f, 0f), true).x, Is.Zero);
+        }
+
+        /// <summary>
+        /// 検証したい判断を壊さないための数値の前提(GDD 6章 盤面B)。
+        /// 1体1ポーズに散らした4ポーズ技では誰も倒れない = 硬直中に殴り返される相手が残る。
+        /// 1体に集中すれば3ポーズで倒せる = 欲張る価値がある。
+        /// </summary>
+        [Test]
+        public void Balance_SpreadingCannotWipe_ButFocusingKills()
+        {
+            var t = T;
+            float spreadPerEnemy = CutRules.StrikeDamage(t, BrickKind.Palm, 4);
+            Assert.That(spreadPerEnemy, Is.LessThan(t.EnemyMaxHealth), "4ポーズを1体ずつに散らしても倒せない");
+
+            float focus3 = 3 * CutRules.StrikeDamage(t, BrickKind.Palm, 3);
+            Assert.That(focus3, Is.GreaterThanOrEqualTo(t.EnemyMaxHealth), "3ポーズを1体に集中すれば倒せる");
+
+            float focus2 = 2 * CutRules.StrikeDamage(t, BrickKind.Palm, 2);
+            Assert.That(focus2, Is.LessThan(t.EnemyMaxHealth), "2ポーズでは倒しきれない");
+        }
     }
 }

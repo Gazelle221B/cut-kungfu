@@ -87,6 +87,19 @@ namespace CutKungfu.Core
         public static float StrikeDamage(in Tuning t, BrickKind kind, int poseCountInCut)
             => t.CutBaseDamage * t.GetBrick(kind).DamageScale * PowerMultiplier(t, poseCountInCut);
 
+        /// <summary>
+        /// 命中補正: 打点から (判定半径+assist) 以内に敵がいれば、打点を最大 assist だけその敵へ寄せる。
+        /// 生成された動きが目標から少しずれても「当たったように見える」ための層。
+        /// </summary>
+        public static float2 AssistStrikeCenter(float2 center, float strikeRadius, float assist, float2 nearestEnemy, bool hasEnemy)
+        {
+            if (!hasEnemy || assist <= 0f) return center;
+            float2 d = nearestEnemy - center;
+            float dist = math.length(d);
+            if (dist <= 1e-4f || dist > strikeRadius + assist) return center;
+            return center + d / dist * math.min(dist, assist);
+        }
+
         /// <summary>1打で得る映え点。威力に技の映え係数を掛けたもの。</summary>
         public static float HaePoints(in Tuning t, BrickKind kind, float damageDealt)
             => damageDealt * t.GetBrick(kind).HaeScale;

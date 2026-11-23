@@ -58,7 +58,7 @@
 }
 .clapper__cell--take { color: var(--tomato); }
 .clapper__condition {
-    font-size: 13px;
+    font-size: 15px;
     color: var(--teal);
     margin-top: 2px;
 }
@@ -83,7 +83,7 @@
     align-items: center;
     margin-top: 6px;
 }
-.meter__caption { width: 70px; font-size: 14px; -unity-text-align: middle-right; padding-right: 8px; }
+.meter__caption { width: 70px; font-size: 16px; -unity-text-align: middle-right; padding-right: 8px; }
 .meter__track {
     flex-grow: 1;
     height: 14px;
@@ -150,7 +150,7 @@
     border-color: var(--cyan);
     background-color: rgba(79, 138, 139, 0.9);
 }
-.brick__key { font-size: 12px; color: var(--mustard); }
+.brick__key { font-size: 14px; color: var(--mustard); }
 .brick__name { font-size: 15px; -unity-font-style: bold; }
 .slow-panel__summary {
     flex-direction: row;
@@ -160,7 +160,7 @@
 .slow-panel__big { font-size: 30px; -unity-font-style: bold; color: var(--cyan); margin-right: 16px; }
 .slow-panel__stat { font-size: 18px; margin-right: 16px; }
 .slow-panel__stat--commit { color: var(--danger); -unity-font-style: bold; }
-.slow-panel__hint { font-size: 13px; color: rgba(243, 230, 200, 0.75); margin-top: 4px; }
+.slow-panel__hint { font-size: 15px; color: rgba(243, 230, 200, 0.75); margin-top: 4px; }
 
 /* --- 大見出し(NG! / カット!OK / テイク) --- */
 .banner {
@@ -203,7 +203,7 @@
 .help {
     position: absolute;
     left: 20px; right: 20px; bottom: 10px;
-    font-size: 12px;
+    font-size: 14px;
     color: rgba(243, 230, 200, 0.7);
     -unity-text-align: middle-center;
 }
