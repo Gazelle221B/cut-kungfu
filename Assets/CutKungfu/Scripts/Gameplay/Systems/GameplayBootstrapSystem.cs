@@ -29,6 +29,7 @@ namespace CutKungfu.Gameplay
             em.AddBuffer<DamageRequest>(e);
             em.AddBuffer<FeedbackEvent>(e);
             em.AddBuffer<TelemetryEvent>(e);
+            em.AddBuffer<CutAreaDamage>(e);
 
             state.Enabled = false;
         }

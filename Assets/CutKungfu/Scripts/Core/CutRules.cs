@@ -105,6 +105,23 @@ namespace CutKungfu.Core
             return center + d / dist * math.min(dist, assist);
         }
 
+        /// <summary>範囲技(1回の技の中で、同じ敵への合計ダメージに上限がかかる)か。飛び蹴りの経路判定は含めない。</summary>
+        public static bool IsAreaBrick(BrickKind kind) => kind == BrickKind.Spin || kind == BrickKind.TableLanding;
+
+        /// <summary>
+        /// 範囲技の1打で、実際に与えるダメージ。この技ですでにその敵へ範囲技で与えた量(alreadyTaken)と合わせて、
+        /// 最大体力 × <see cref="Tuning.AreaDamageCapRatio"/> を超えないよう削る。削ったら capped = true。
+        /// </summary>
+        public static float CapAreaDamage(in Tuning t, float maxHealth, float alreadyTaken, float damage, out bool capped)
+        {
+            capped = false;
+            if (t.AreaDamageCapRatio >= 1f) return damage;
+            float allowed = math.max(0f, t.AreaDamageCapRatio * maxHealth - alreadyTaken);
+            if (damage <= allowed) return damage;
+            capped = true;
+            return allowed;
+        }
+
         /// <summary>1打で得る映え点。威力に技の映え係数を掛けたもの。</summary>
         public static float HaePoints(in Tuning t, BrickKind kind, float damageDealt)
             => damageDealt * t.GetBrick(kind).HaeScale;

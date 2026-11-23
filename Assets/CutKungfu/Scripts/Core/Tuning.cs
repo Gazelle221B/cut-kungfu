@@ -62,6 +62,11 @@ namespace CutKungfu.Core
         /// 範囲技を重ねて包囲を1回で全滅させる解を消すためのルール(SurroundBalanceTests)。
         /// </summary>
         public float RepeatBrickScale;
+        /// <summary>
+        /// 1回の技の中で、範囲技(回し蹴り・机上の着地)が同じ敵に与える合計ダメージの上限(敵の最大体力に対する割合)。
+        /// 範囲技を混ぜて包囲を1回で全滅させる解を消す(とどめは単体技に任せる)。1 以上で無効。技ごとにリセットする。
+        /// </summary>
+        public float AreaDamageCapRatio;
         /// <summary>打点を近くの敵へ寄せる最大距離[m](GDD 15章「拳が敵に当たらない」への補正層)。0 で無効。</summary>
         public float StrikeAssist;
         public bool InvulnerableDuringSlow;
@@ -152,6 +157,7 @@ namespace CutKungfu.Core
             CutSegmentMin = 0.14f,
             CutSegmentMax = 0.38f,
             RepeatBrickScale = 0.5f,
+            AreaDamageCapRatio = 0.8f,
             StrikeAssist = 1.2f,
             InvulnerableDuringSlow = true,
             // 実行中も殴られる(TDD 7章「中断」)。スロー中に敵の予備動作を読む意味を残す

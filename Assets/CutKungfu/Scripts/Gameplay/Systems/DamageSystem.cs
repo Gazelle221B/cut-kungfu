@@ -70,18 +70,24 @@ namespace CutKungfu.Gameplay
                 float2 p = ltRef.ValueRO.Position.xz;
                 if (!Geometry2D.CapsuleOverlapsCircle(req.A, req.B, req.Radius, p, f.Radius)) continue;
 
-                f.Health -= req.Damage;
+                bool isCut = req.Kind == StrikeKind.Cut;
+                float damage = req.Damage;
+                bool capped = false;
+                if (isCut && CutRules.IsAreaBrick(req.Brick))
+                    damage = CapAreaDamage(ref state, entity, f.MaxHealth, req.Damage, tuning, out capped);
+
+                f.Health -= damage;
                 f.Flash = 0.12f;
                 f.HitStun = math.max(f.HitStun, req.HitStun);
                 kbRef.ValueRW.Velocity = Push(req, p) * req.Knockback;
                 hitStop.Request(req.HitStop);
-                bool isCut = req.Kind == StrikeKind.Cut;
                 shake.Add(isCut ? 0.35f : 0.12f);
 
                 float hae = 0f;
                 if (isCut)
                 {
-                    hae = CutRules.HaePoints(tuning, req.Brick, req.Damage);
+                    hae = CutRules.HaePoints(tuning, req.Brick, damage);
+                    if (capped) cut.Record.AreaCapHits++;
                     cut.Record.Hae += hae;
                     session.Score += hae;
                 }
@@ -92,9 +98,9 @@ namespace CutKungfu.Gameplay
 
                 feedback.Add(new FeedbackEvent
                 {
-                    Kind = isCut ? FeedbackKind.CutHit : FeedbackKind.Hit,
+                    Kind = capped ? FeedbackKind.CutHitCapped : isCut ? FeedbackKind.CutHit : FeedbackKind.Hit,
                     Position = ltRef.ValueRO.Position,
-                    Value = req.Damage,
+                    Value = damage,
                     Extra = (int)math.round(hae),
                 });
 
@@ -192,6 +198,20 @@ namespace CutKungfu.Gameplay
                     PlayerHealth = f.Health,
                 },
             });
+        }
+
+        /// <summary>範囲技の1打を、この技でその敵へ与えた範囲技ダメージの台帳と照らして削る。</summary>
+        float CapAreaDamage(ref SystemState state, Entity enemy, float maxHealth, float damage, in Tuning tuning, out bool capped)
+        {
+            var ledger = SystemAPI.GetSingletonBuffer<CutAreaDamage>();
+            int index = -1;
+            for (int i = 0; i < ledger.Length; i++)
+                if (ledger[i].Enemy == enemy) { index = i; break; }
+            float taken = index >= 0 ? ledger[index].Taken : 0f;
+            float applied = CutRules.CapAreaDamage(tuning, maxHealth, taken, damage, out capped);
+            if (index >= 0) ledger[index] = new CutAreaDamage { Enemy = enemy, Taken = taken + applied };
+            else ledger.Add(new CutAreaDamage { Enemy = enemy, Taken = applied });
+            return applied;
         }
 
         int FormationSize(ref SystemState state, int wave)

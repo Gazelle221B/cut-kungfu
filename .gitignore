@@ -129,3 +129,6 @@ InitTestScene*.unity*
 *.sentis.meta
 *.bvh
 *.bvh.meta
+
+# Chat transcript the TDD was extracted from (local only; docs/TDD_cut_kungfu_v0.1.md is the committed copy)
+meeting.md

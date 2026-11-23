@@ -43,6 +43,7 @@ namespace CutKungfu.Presentation
                 case FeedbackKind.CutCancelled: Fire(source, "undo", 0.8f); break;
                 case FeedbackKind.Hit: Fire(source, "hit", 0.95f + (float)_rng.NextDouble() * 0.1f); break;
                 case FeedbackKind.CutHit: Fire(source, "cuthit", 0.95f + (float)_rng.NextDouble() * 0.1f); break;
+                case FeedbackKind.CutHitCapped: Fire(source, "hit", 0.75f); break;
                 case FeedbackKind.Kill: Fire(source, "cuthit", 0.7f); break;
                 case FeedbackKind.Parry: Fire(source, "parry", 1f); break;
                 case FeedbackKind.PlayerHurt: Fire(source, "hurt", 1f); break;

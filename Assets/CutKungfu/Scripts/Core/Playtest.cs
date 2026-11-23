@@ -59,6 +59,8 @@ namespace CutKungfu.Core
         public float MinEnemyEta;
         /// <summary>技の実行中に殴られて中断したか。</summary>
         public bool Interrupted;
+        /// <summary>この技で、範囲技の打撃が上限(AreaDamageCapRatio)に掛かって削られた回数。</summary>
+        public int AreaCapHits;
     }
 
     public static class PlaytestCsv
@@ -66,7 +68,7 @@ namespace CutKungfu.Core
         public const string Header =
             "kind,time,wave,formation_enemies,take,commit_enabled,enemies_alive,enemies_near,poses,sequence," +
             "gauge_before,max_affordable,commit_time,kills,hit_during_commit,hae,player_hp," +
-            "slow_seconds,timed_out,undos,rejects,min_enemy_eta,interrupted";
+            "slow_seconds,timed_out,undos,rejects,min_enemy_eta,interrupted,area_cap_hits";
 
         public static string KindCode(PlaytestEventKind k) => k switch
         {
@@ -106,7 +108,8 @@ namespace CutKungfu.Core
               .Append(e.Undos).Append(',')
               .Append(e.Rejects).Append(',')
               .Append(e.MinEnemyEta.ToString("F2", c)).Append(',')
-              .Append(e.Interrupted ? 1 : 0);
+              .Append(e.Interrupted ? 1 : 0).Append(',')
+              .Append(e.AreaCapHits);
             return sb.ToString();
         }
     }

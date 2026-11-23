@@ -66,20 +66,15 @@ namespace CutKungfu.Tests
             public string Name;
             public float3 Player;
             public float[] EnemyAngles;
-            /// <summary>
-            /// 既知の問題: ゲージ60(4個技)なら、机上の着地を含む組み合わせで全滅できる(22通り)。
-            /// 直し方の判断待ちのため、このケースは実行せずに理由つきで残す。
-            /// </summary>
-            public bool KnownWipeWithFourPoses;
             public override string ToString() => Name;
         }
 
         static readonly SurroundSetup[] Setups =
         {
             // 机(x 1.8〜4.2, z 0.2〜1.4)の左脇。机上の着地の範囲(半径2.0)に3体とも入る
-            new SurroundSetup { Name = "机の左脇", Player = new float3(1.2f, 0f, 0.8f), EnemyAngles = new[] { 90f, 210f, 330f }, KnownWipeWithFourPoses = true },
+            new SurroundSetup { Name = "机の左脇", Player = new float3(1.2f, 0f, 0.8f), EnemyAngles = new[] { 90f, 210f, 330f } },
             // 机の手前。机の上からは手前の1体に届きにくい
-            new SurroundSetup { Name = "机の手前", Player = new float3(3f, 0f, -1.0f), EnemyAngles = new[] { 180f, 270f, 0f }, KnownWipeWithFourPoses = true },
+            new SurroundSetup { Name = "机の手前", Player = new float3(3f, 0f, -1.0f), EnemyAngles = new[] { 180f, 270f, 0f } },
             // 机に届かない(到達6mの外)。机上の着地は置けない
             new SurroundSetup { Name = "机に届かない", Player = new float3(-6f, 0f, 0f), EnemyAngles = new[] { 90f, 210f, 330f } },
         };
@@ -88,12 +83,7 @@ namespace CutKungfu.Tests
         {
             foreach (var setup in Setups)
             foreach (var gauge in new[] { 50f, 60f })
-            {
-                var data = new TestCaseData(setup, gauge).SetName($"MixedAreaCombos_CannotWipeTheSurround({setup.Name}, ゲージ{gauge})");
-                if (setup.KnownWipeWithFourPoses && gauge >= 60f)
-                    data = data.Ignore("既知の問題: 机上の着地を含む4個技で包囲を全滅できる(22通り、PR #1 で報告済み)。直し方が決まったら外す");
-                yield return data;
-            }
+                yield return new TestCaseData(setup, gauge).SetName($"MixedAreaCombos_CannotWipeTheSurround({setup.Name}, ゲージ{gauge})");
         }
 
         /// <summary>
@@ -149,6 +139,93 @@ namespace CutKungfu.Tests
             Assert.That(wipes, Is.Empty, $"{setup.Name}・ゲージ{gauge}で、1回の技で包囲を全滅できる組み合わせ:\n" + string.Join("\n", wipes));
         }
 
+        static IEnumerable<TestCaseData> PalmMixedCases()
+        {
+            foreach (var setup in Setups)
+            foreach (var gauge in new[] { 50f, 60f })
+                yield return new TestCaseData(setup, gauge).SetName($"Measure_AreaThenPalmFinish({setup.Name}, ゲージ{gauge})");
+        }
+
+        /// <summary>
+        /// 計測用(通常は走らせない): 範囲技で削って掌底でとどめを刺す並び。倒せるのは想定どおりなので合否は付けず、
+        /// 3体全滅の可否と残り体力を記録する。並びは {回し蹴り, 机上の着地, 飛び蹴り, 掌底} の2〜4個で、
+        /// 掌底と範囲技(回し蹴りか机上の着地)を少なくとも1つずつ含むもの。
+        /// 掌底は狙う敵の手前(自分側へ 0.7m)に置き、敵を順に狙う。
+        /// </summary>
+        [Explicit("計測用: 範囲技+掌底の全滅の可否を記録する(合否なし)")]
+        [TestCaseSource(nameof(PalmMixedCases))]
+        public void Measure_AreaThenPalmFinish(SurroundSetup setup, float gauge)
+        {
+            var table = GameplayTestWorld.StageTable;
+            int affordable = CutRules.AffordablePoses(Tuning.Default, gauge - Tuning.Default.SlowFixedCost, 0);
+            var wipes = new List<string>();
+            var survivors = new int[4];
+            int runs = 0;
+            float minRemainingWhenNotWiped = float.MaxValue;
+
+            foreach (var seq in Sequences(new[] { S, T, F, P }, 2, affordable))
+            {
+                bool hasPalm = false, hasArea = false;
+                foreach (var k in seq) { hasPalm |= k == P; hasArea |= CutRules.IsAreaBrick(k); }
+                if (!hasPalm || !hasArea) continue;
+
+                using var w = SurroundedAt(setup);
+                w.AddTable(table);
+                w.Step();
+                w.SetGauge(gauge);
+
+                var spawns = EnemySpawns(setup);
+                float2 tablePoint = math.clamp(setup.Player.xz, table.Center - table.HalfExtents + 0.2f, table.Center + table.HalfExtents - 0.2f);
+                var poses = new (BrickKind, float3)[seq.Length];
+                int flyTarget = 0, palmTarget = 0;
+                for (int i = 0; i < seq.Length; i++)
+                {
+                    if (seq[i] == P)
+                    {
+                        float3 enemy = spawns[palmTarget++ % spawns.Length];
+                        float3 toward = math.normalizesafe(enemy - setup.Player);
+                        poses[i] = (P, enemy - toward * 0.7f);
+                    }
+                    else
+                    {
+                        poses[i] = seq[i] switch
+                        {
+                            S => (S, setup.Player),
+                            T => (T, new float3(tablePoint.x, table.TopY, tablePoint.y)),
+                            _ => (F, spawns[flyTarget++ % spawns.Length]),
+                        };
+                    }
+                }
+
+                w.PerformCut(poses);
+                var cut = w.Em.GetComponentData<CutState>(w.Player);
+                if (cut.Phase != CutPhase.Executing) continue;
+                string placed = BrickSequence.ToCodeString(cut.Record.Sequence);
+                runs++;
+                for (int i = 0; i < 300 && w.Em.GetComponentData<CutState>(w.Player).Phase == CutPhase.Executing; i++) w.Step();
+
+                int alive = w.AliveEnemies();
+                survivors[math.clamp(alive, 0, 3)]++;
+                var hp = new StringBuilder();
+                float remaining = 0f;
+                foreach (var e in w.Enemies())
+                {
+                    float h = w.Em.GetComponentData<Fighter>(e).Health;
+                    hp.Append(h.ToString("0.0")).Append(' ');
+                    if (h > 0f) remaining += h;
+                }
+                if (alive == 0) wipes.Add($"{placed} (残り体力 {hp.ToString().Trim()})");
+                else minRemainingWhenNotWiped = math.min(minRemainingWhenNotWiped, remaining);
+            }
+
+            string summary = $"{setup.Name} ゲージ{gauge}: {runs} 通り / 生存0体 {survivors[0]}・1体 {survivors[1]}・2体 {survivors[2]}・3体 {survivors[3]}"
+                             + (runs > survivors[0] ? $" / 全滅しなかった中で残り体力の合計の最小 {minRemainingWhenNotWiped:0.0}" : "")
+                             + (wipes.Count > 0 ? "\n全滅:\n" + string.Join("\n", wipes) : "");
+            TestContext.WriteLine(summary);
+            UnityEngine.Debug.Log("[MEASURE] " + summary);
+            Assert.Pass(summary);
+        }
+
         static GameplayTestWorld SurroundedAt(SurroundSetup setup) => new GameplayTestWorld(setup.Player, EnemySpawns(setup));
 
         static float3[] EnemySpawns(SurroundSetup setup)
@@ -179,6 +256,31 @@ namespace CutKungfu.Tests
                     if (k < 0) break;
                 }
             }
+        }
+
+        [Test]
+        public void AreaCap_IsShownAndCountedInTheCutRecord()
+        {
+            var setup = Setups[0]; // 机の左脇
+            using var w = SurroundedAt(setup);
+            w.AddTable(GameplayTestWorld.StageTable);
+            w.Step();
+            w.SetGauge(60f);
+            var table = GameplayTestWorld.StageTable;
+            float2 tp = math.clamp(setup.Player.xz, table.Center - table.HalfExtents + 0.2f, table.Center + table.HalfExtents - 0.2f);
+            w.PerformCut((T, new float3(tp.x, table.TopY, tp.y)), (S, setup.Player), (S, setup.Player), (S, setup.Player));
+
+            bool cappedFeedback = false;
+            for (int i = 0; i < 300 && w.Em.GetComponentData<CutState>(w.Player).Phase == CutPhase.Executing; i++)
+            {
+                w.Step();
+                foreach (var f in w.Em.GetBuffer<FeedbackEvent>(w.Em.CreateEntityQuery(typeof(FeedbackEvent)).GetSingletonEntity()))
+                    if (f.Kind == FeedbackKind.CutHitCapped) cappedFeedback = true;
+                w.Em.GetBuffer<FeedbackEvent>(w.Em.CreateEntityQuery(typeof(FeedbackEvent)).GetSingletonEntity()).Clear();
+            }
+            Assert.That(cappedFeedback, Is.True, "上限に掛かった打撃はプレイヤーに分かる出来事として出る");
+            Assert.That(w.Em.GetComponentData<CutState>(w.Player).Record.AreaCapHits, Is.GreaterThan(0));
+            Assert.That(w.AliveEnemies(), Is.GreaterThan(0));
         }
 
         [Test]
