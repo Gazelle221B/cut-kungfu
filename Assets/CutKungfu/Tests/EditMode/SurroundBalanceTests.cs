@@ -258,6 +258,91 @@ namespace CutKungfu.Tests
             Assert.Pass(report.ToString());
         }
 
+        /// <summary>
+        /// 計測用(合否なし): 対策の候補を格子で比べる。既知の全滅5通り×種20通りを「予備動作中を含む」条件で流し、
+        /// 調整値を上書きする: 範囲技で当てた敵の被弾硬直(EnemyAreaHitStun)× 4個技の威力倍率(PowerByPoseCount.w)。
+        /// あわせて、各格子で前提が崩れないかを確かめる。
+        /// </summary>
+        [Explicit("計測用: 範囲技の被弾硬直×4個技の倍率の格子で、既知の全滅5通りを流す(合否なし)")]
+        [Test]
+        public void Measure_KnownWipes_CountermeasureGrid()
+        {
+            var report = new StringBuilder();
+            report.Append("範囲技の被弾硬直 | 4個技の倍率 | 出し切って全滅 | 途中で中断 | 出し切ったが全滅せず | 全滅率 | 散らした4個で全滅できない | 1体に集中で3個撃破 | 飛び蹴りでとどめ | 4個技>3個技\n");
+            foreach (float areaStun in new[] { 0.8f, 0.3f, 0f })
+            foreach (float power4 in new[] { 3.5f, 3.0f, 2.8f })
+            {
+                var tuning = Tuning.Default;
+                tuning.EnemyAreaHitStun = areaStun;
+                tuning.PowerByPoseCount.w = power4;
+
+                int wiped = 0, interrupted = 0, survived = 0, runs = 0;
+                foreach (var (setupIndex, seq) in KnownWipes)
+                for (int seed = 1; seed <= PressureSeeds; seed++)
+                {
+                    var r = RunUnderPressure(Setups[setupIndex], seq, seed, includeWindups: true, tuning);
+                    if (!r.Placed) continue;
+                    runs++;
+                    if (r.Interrupted) interrupted++;
+                    else if (r.Alive == 0) wiped++;
+                    else survived++;
+                }
+
+                var p = CheckPremises(tuning);
+                report.Append($"{areaStun:0.0} | {power4:0.0} | {wiped} | {interrupted} | {survived} | {(runs > 0 ? 100f * wiped / runs : 0f):0}% | ")
+                      .Append($"{Mark(p.SpreadCannotWipe)} | {Mark(p.FocusThreeKills)} | {Mark(p.FlyingKickFinishes)} | {Mark(p.FourBeatsThree)}\n");
+            }
+
+            TestContext.WriteLine(report.ToString());
+            UnityEngine.Debug.Log("[GRID]\n" + report);
+            Assert.Pass(report.ToString());
+        }
+
+        static string Mark(bool ok) => ok ? "保つ" : "崩れる";
+
+        struct Premises
+        {
+            public bool SpreadCannotWipe;
+            public bool FocusThreeKills;
+            public bool FlyingKickFinishes;
+            public bool FourBeatsThree;
+        }
+
+        /// <summary>格子の値で、守るべき前提を確かめる(ルールの計算と、飛び蹴りのとどめはゲームロジック一式で)。</summary>
+        static Premises CheckPremises(in Tuning t)
+        {
+            float hp = t.EnemyMaxHealth;
+            float focus3 = 0f;
+            for (int k = 0; k < 3; k++) focus3 += CutRules.StrikeDamage(t, BrickKind.Palm, 3, repeatIndex: k);
+            // 4個目を置く得: 別々のブリック(繰り返しの減衰なし)で、4個技の合計が3個技の合計を上回る
+            float four = 0f, three = 0f;
+            var kinds = new[] { BrickKind.Palm, BrickKind.FlyingKick, BrickKind.Spin, BrickKind.TableLanding };
+            for (int i = 0; i < 4; i++) four += CutRules.StrikeDamage(t, kinds[i], 4);
+            for (int i = 0; i < 3; i++) three += CutRules.StrikeDamage(t, kinds[i], 3);
+            return new Premises
+            {
+                SpreadCannotWipe = CutRules.StrikeDamage(t, BrickKind.Palm, 4) < hp,
+                FocusThreeKills = focus3 >= hp,
+                FlyingKickFinishes = FlyingKickFinishesAfterAreaCap(t),
+                FourBeatsThree = four > three,
+            };
+        }
+
+        /// <summary>回し蹴り×3で上限まで削った単体の敵に、飛び蹴りでとどめを刺せるか(FlyingKick_FinishesAWeakenedSingleEnemy と同じ流れ)。</summary>
+        static bool FlyingKickFinishesAfterAreaCap(in Tuning t)
+        {
+            float3 enemyAt = new float3(2.5f, 0f, 0f);
+            using var w = new GameplayTestWorld(float3.zero, enemyAt);
+            var ts = w.Singleton<TuningSingleton>();
+            ts.Value = t;
+            w.SetSingleton(ts);
+            w.Step();
+            w.SetGauge(60f);
+            w.PerformCut((S, float3.zero), (S, float3.zero), (S, float3.zero), (F, enemyAt));
+            for (int i = 0; i < 300 && w.Em.GetComponentData<CutState>(w.Player).Phase == CutPhase.Executing; i++) w.Step();
+            return w.AliveEnemies() == 0;
+        }
+
         struct PressureResult
         {
             public bool Placed;
@@ -273,6 +358,9 @@ namespace CutKungfu.Tests
         {
             using var w = SurroundedAt(setup);
             w.AddTable(GameplayTestWorld.StageTable);
+            var ts = w.Singleton<TuningSingleton>();
+            ts.Value = tuning;
+            w.SetSingleton(ts);
             w.Step();
             w.SetGauge(60f);
 
