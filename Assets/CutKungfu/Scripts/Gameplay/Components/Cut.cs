@@ -64,6 +64,11 @@ namespace CutKungfu.Gameplay
         /// <summary>この技の中で、同じブリックを前に何回置いたか(初回 0)。繰り返しの減衰に使う。</summary>
         public int RepeatIndex;
         public Entity Ghost;
+        /// <summary>
+        /// 置いたときに、この単体技(掌底・飛び蹴り)が到達点で狙う敵(命中補正が届く範囲で最寄り。いなければ Null、範囲技は常に Null)。
+        /// 記録用(置き方を見分ける)。判定には使わない。
+        /// </summary>
+        public Entity AimedEnemy;
     }
 
     /// <summary>空間に残る半透明の人影(置いたポーズ)。</summary>

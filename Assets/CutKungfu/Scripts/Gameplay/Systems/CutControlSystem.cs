@@ -154,7 +154,8 @@ namespace CutKungfu.Gameplay
                     int repeat = 0;
                     for (int i = 0; i < placedPoses.Length; i++)
                         if (placedPoses[i].Kind == cut.SelectedKind) repeat++;
-                    placedPoses.Add(new PlacedPose { Kind = cut.SelectedKind, Position = pos, Yaw = yaw, RepeatIndex = repeat, Ghost = ghost });
+                    var aimed = CutRules.IsAreaBrick(cut.SelectedKind) ? Entity.Null : AimedEnemy(ref state, pos, yaw, brick, tuning);
+                    placedPoses.Add(new PlacedPose { Kind = cut.SelectedKind, Position = pos, Yaw = yaw, RepeatIndex = repeat, Ghost = ghost, AimedEnemy = aimed });
                     Feedback(ref state, FeedbackKind.PosePlaced, pos, placed + 1);
                     placed++;
                     // 置いた直後は次のアンカーで判定し直す
@@ -246,6 +247,7 @@ namespace CutKungfu.Gameplay
             }
 
             cut.PoseCount = poses.Length;
+            cut.Record.AimedEnemies = CountAimedEnemies(poses);
             // 範囲技の上限は技ごと: 新しい技の始まりで台帳を空にする
             SystemAPI.GetSingletonBuffer<CutAreaDamage>().Clear();
             cut.SegmentIndex = 0;
@@ -264,6 +266,35 @@ namespace CutKungfu.Gameplay
             s.ValueRW.LastCommitTime = cut.CommitDuration;
 
             Feedback(ref state, FeedbackKind.CutRelease, playerPos, cut.PoseCount);
+        }
+
+        /// <summary>置いた単体技が到達点で狙う敵(打点から 判定半径+命中補正 以内の最寄り)。CutExecutionSystem の「狙った敵」と同じ決め方。</summary>
+        Entity AimedEnemy(ref SystemState state, float3 pos, float yaw, in BrickTuning brick, in Tuning tuning)
+        {
+            float2 center = pos.xz + new float2(math.sin(yaw), math.cos(yaw)) * brick.StrikeForward;
+            float best = math.square(brick.StrikeRadius + tuning.StrikeAssist);
+            var found = Entity.Null;
+            foreach (var (lt, e) in SystemAPI.Query<RefRO<LocalTransform>>().WithAll<EnemyTag>().WithNone<Dying>().WithEntityAccess())
+            {
+                float d = math.distancesq(lt.ValueRO.Position.xz, center);
+                if (d <= best) { best = d; found = e; }
+            }
+            return found;
+        }
+
+        /// <summary>置いた単体技が狙った、異なる敵の数。</summary>
+        static int CountAimedEnemies(DynamicBuffer<PlacedPose> poses)
+        {
+            int count = 0;
+            for (int i = 0; i < poses.Length; i++)
+            {
+                var e = poses[i].AimedEnemy;
+                if (e == Entity.Null) continue;
+                bool seen = false;
+                for (int j = 0; j < i; j++) seen |= poses[j].AimedEnemy == e;
+                if (!seen) count++;
+            }
+            return count;
         }
 
         static Entity SpawnGhost(ref SystemState state, Entity prefab, float3 pos, float yaw, int order, bool preview, float4 color)

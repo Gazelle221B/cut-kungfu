@@ -220,23 +220,67 @@ namespace CutKungfu.Tests
         }
 
         /// <summary>
-        /// 回帰テスト(種を固定): 包囲で、4個技の硬直中の被弾が1〜3個技より明確に多い(最大の2倍以上)。
+        /// 回帰テスト(種を固定・待ちのみ): 包囲で、4個技の硬直中の被弾が1〜3個技より明確に多い(最大の3倍以上)。
         /// 条件B(コミット時間なし)では4個技でも硬直中の被弾は起きない。罰が届くのは4個目の硬直だけ、という現状の前提を守る。
+        /// 待ちのみにするのは、予備動作中の敵を混ぜると、硬直の長さと関係なく殴られる分(1個技の硬直中 6件など)が入るため。
         /// </summary>
         [Test]
-        [Ignore("前提が崩れた(既定値は変えずに保留): 時間基準に直した後は、4個技の硬直中の被弾 11/60 が1〜3個技の最大 6 の2倍に届かない。" +
-                "直す前の 23/60 は dt 1/60 の誤差で多めに出ていた。調整の候補は Measure_CommitPunishmentGrid の結果を参照")]
         public void FourPoseCommit_IsPunishedMoreThanSmallerCuts()
         {
-            var a = Measure(Tuning.Default, commitEnabled: true);
+            var a = Measure(Tuning.Default, commitEnabled: true, includeWindups: false);
             int smallerMax = math.max(a[0, 1], math.max(a[1, 1], a[2, 1]));
             var sb = new StringBuilder();
             AppendTable(sb, a);
             Assert.That(a[3, 1], Is.GreaterThan(0), sb.ToString());
-            Assert.That(a[3, 1], Is.GreaterThanOrEqualTo(2 * smallerMax), "4個技の硬直中の被弾が1〜3個技より明確に多くない:\n" + sb);
+            Assert.That(a[3, 1], Is.GreaterThanOrEqualTo(3 * smallerMax), "4個技の硬直中の被弾が1〜3個技より明確に多くない:\n" + sb);
 
-            var b = Measure(Tuning.Default, commitEnabled: false, onlyPoses: 4);
+            var b = Measure(Tuning.Default, commitEnabled: false, includeWindups: false, onlyPoses: 4);
             Assert.That(b[3, 1], Is.Zero, "条件Bで硬直中に殴られた");
+        }
+
+        /// <summary>
+        /// 記録の aimed_enemies(置いた単体技が狙った敵の数)で、4個技の置き方を見分けられる。
+        /// 計測の並び: 範囲技始動 spin>fly>palm>palm=2(回し蹴りは数えない)、散らす=3、
+        /// 「集中」palm>fly>palm>fly=2(3つ目の掌底は敵の手前へ戻る向きに置くので、到達点は主人公の側を向き、別の敵を狙う)。
+        /// 4つとも敵0へ向けて置いた並び=1。
+        /// </summary>
+        [TestCase(0, 2)]
+        [TestCase(1, 3)]
+        [TestCase(2, 2)]
+        [TestCase(-1, 1)]
+        public void FourPoseCut_RecordsHowManyEnemiesItAimedAt(int planIndex, int expected)
+        {
+            var plan = planIndex >= 0 ? PlansByCount[3][planIndex] : null;
+            float3 e0 = Enemy(0), outward = math.normalizesafe(e0 - Player);
+            // 4つとも到達点が敵0を向く並び: 手前の掌底 → 奥への飛び蹴り → 奥から戻る掌底(主人公側を向くが敵0が最寄り)→ 奥への飛び蹴り
+            var poses = plan != null ? new (BrickKind, float3)[plan.Poses.Length] : new[]
+            {
+                (P, At(P, 0)), (F, e0 + outward * 1f), (P, e0 + outward * 0.3f), (F, e0 + outward * 1f),
+            };
+            if (plan != null)
+                for (int i = 0; i < poses.Length; i++) poses[i] = (plan.Poses[i].kind, At(plan.Poses[i].kind, plan.Poses[i].target));
+            string name = plan != null ? plan.Name : "敵0へ4つとも向ける";
+
+            using var w = new GameplayTestWorld(Player, Enemy(0), Enemy(1), Enemy(2));
+            w.Step();
+            w.SetGauge(60f);
+            foreach (var e in w.Enemies())
+            {
+                var brain = w.Em.GetComponentData<EnemyBrain>(e);
+                brain.State = EnemyState.Approach;
+                brain.Cooldown = 99f; // 殴らせない(置き方の記録だけを見る)
+                w.Em.SetComponentData(e, brain);
+            }
+            w.PerformCut(poses);
+            w.RunUntilCutFinished();
+
+            PlaytestEvent? record = null;
+            foreach (var t in w.Em.GetBuffer<TelemetryEvent>(w.Em.CreateEntityQuery(typeof(TelemetryEvent)).GetSingletonEntity()))
+                if (t.Value.Kind == PlaytestEventKind.Cut) record = t.Value;
+            Assert.That(record.HasValue, Is.True, "技の記録が無い");
+            Assert.That(record.Value.Poses, Is.EqualTo(4));
+            Assert.That(record.Value.AimedEnemies, Is.EqualTo(expected), name);
+            StringAssert.EndsWith("," + expected, PlaytestCsv.ToRow(record.Value));
         }
 
         /// <summary>

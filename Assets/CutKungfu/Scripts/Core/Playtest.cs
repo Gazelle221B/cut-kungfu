@@ -61,6 +61,11 @@ namespace CutKungfu.Core
         public bool Interrupted;
         /// <summary>この技で、範囲技の打撃が上限(AreaDamageCapRatio)に掛かって削られた回数。</summary>
         public int AreaCapHits;
+        /// <summary>
+        /// 置いた単体技(掌底・飛び蹴り)が到達点で狙った敵の数(置いたときの位置で決める。同じ敵は1つと数え、範囲技は数えない)。
+        /// 4個技を1体に集中したか(1)、散らしたか(2〜3)を見分ける。
+        /// </summary>
+        public int AimedEnemies;
     }
 
     public static class PlaytestCsv
@@ -68,7 +73,7 @@ namespace CutKungfu.Core
         public const string Header =
             "kind,time,wave,formation_enemies,take,commit_enabled,enemies_alive,enemies_near,poses,sequence," +
             "gauge_before,max_affordable,commit_time,kills,hit_during_commit,hae,player_hp," +
-            "slow_seconds,timed_out,undos,rejects,min_enemy_eta,interrupted,area_cap_hits";
+            "slow_seconds,timed_out,undos,rejects,min_enemy_eta,interrupted,area_cap_hits,aimed_enemies";
 
         public static string KindCode(PlaytestEventKind k) => k switch
         {
@@ -109,7 +114,8 @@ namespace CutKungfu.Core
               .Append(e.Rejects).Append(',')
               .Append(e.MinEnemyEta.ToString("F2", c)).Append(',')
               .Append(e.Interrupted ? 1 : 0).Append(',')
-              .Append(e.AreaCapHits);
+              .Append(e.AreaCapHits).Append(',')
+              .Append(e.AimedEnemies);
             return sb.ToString();
         }
     }
