@@ -82,5 +82,19 @@ namespace CutKungfu.Tests
             StringAssert.StartsWith("cut,", row);
             StringAssert.Contains(",fly,", row);
         }
+
+        [Test]
+        public void PlaytestCsv_HasGaugeAtSlowEntry_AndMaxAffordablePoses()
+        {
+            var header = PlaytestCsv.Header.Split(',');
+            int gauge = System.Array.IndexOf(header, "gauge_before");
+            int affordable = System.Array.IndexOf(header, "max_affordable");
+            Assert.That(gauge, Is.GreaterThanOrEqualTo(0));
+            Assert.That(affordable, Is.GreaterThanOrEqualTo(0));
+
+            var row = PlaytestCsv.ToRow(new PlaytestEvent { Kind = PlaytestEventKind.Cut, GaugeBefore = 40f, MaxAffordablePoses = 2 }).Split(',');
+            Assert.That(row[gauge], Is.EqualTo("40.0"));
+            Assert.That(row[affordable], Is.EqualTo("2"));
+        }
     }
 }

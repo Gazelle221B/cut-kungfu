@@ -70,6 +70,21 @@ namespace CutKungfu.Tests
         }
 
         [Test]
+        public void SlowEntry_RecordsGaugeAndHowManyPosesWereAffordable()
+        {
+            Step();
+            Step(new PlayerInput { Cut = true });
+            Step(new PlayerInput { Cut = true }); // 1個も置かずに解除
+            var events = _em.GetBuffer<TelemetryEvent>(_em.CreateEntityQuery(typeof(TelemetryEvent)).GetSingletonEntity());
+            PlaytestEvent cancelled = default;
+            foreach (var e in events) if (e.Value.Kind == PlaytestEventKind.CutCancelled) cancelled = e.Value;
+
+            Assert.That(cancelled.Kind, Is.EqualTo(PlaytestEventKind.CutCancelled));
+            Assert.That(cancelled.GaugeBefore, Is.EqualTo(Tuning.Default.GaugeAtWaveStart));
+            Assert.That(cancelled.MaxAffordablePoses, Is.EqualTo(3), "ゲージ50 = 固定費20 + 3ポーズ分");
+        }
+
+        [Test]
         public void Undo_RefundsPoseCost()
         {
             Step();

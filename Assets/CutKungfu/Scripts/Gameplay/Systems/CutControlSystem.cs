@@ -112,6 +112,7 @@ namespace CutKungfu.Gameplay
                 EnemiesAlive = _aliveEnemies.CalculateEntityCount(),
                 EnemiesNear = near,
                 GaugeBefore = gauge.Value,
+                MaxAffordablePoses = CutRules.AffordablePoses(tuning, gauge.Value - tuning.SlowFixedCost, 0),
                 MinEnemyEta = minEta == float.MaxValue ? 0f : minEta,
             };
             gauge.Add(-tuning.SlowFixedCost);

@@ -36,7 +36,10 @@ namespace CutKungfu.Core
         public int Poses;
         /// <summary><see cref="BrickSequence"/> で詰めた置いた順。</summary>
         public int Sequence;
+        /// <summary>スロー突入時のゲージ(固定費を払う前)。</summary>
         public float GaugeBefore;
+        /// <summary>そのゲージで置けた最大のポーズ数。poses と比べて「置かなかった」と「置けなかった」を分ける。</summary>
+        public int MaxAffordablePoses;
         public float CommitTime;
         public int Kills;
         public bool HitDuringCommit;
@@ -62,7 +65,7 @@ namespace CutKungfu.Core
     {
         public const string Header =
             "kind,time,wave,formation_enemies,take,commit_enabled,enemies_alive,enemies_near,poses,sequence," +
-            "gauge_before,commit_time,kills,hit_during_commit,hae,player_hp," +
+            "gauge_before,max_affordable,commit_time,kills,hit_during_commit,hae,player_hp," +
             "slow_seconds,timed_out,undos,rejects,min_enemy_eta,interrupted";
 
         public static string KindCode(PlaytestEventKind k) => k switch
@@ -92,6 +95,7 @@ namespace CutKungfu.Core
               .Append(e.Poses).Append(',')
               .Append(BrickSequence.ToCodeString(e.Sequence)).Append(',')
               .Append(e.GaugeBefore.ToString("F1", c)).Append(',')
+              .Append(e.MaxAffordablePoses).Append(',')
               .Append(e.CommitTime.ToString("F2", c)).Append(',')
               .Append(e.Kills).Append(',')
               .Append(e.HitDuringCommit ? 1 : 0).Append(',')

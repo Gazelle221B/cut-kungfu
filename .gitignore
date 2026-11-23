@@ -120,3 +120,12 @@ InitTestScene*.unity*
 .omc/
 .concord/
 .specstory/
+
+# MotionBricks: models and sample motions are not committed
+# (sample motions are under an evaluation-only license; models are fetched separately)
+*.onnx
+*.onnx.meta
+*.sentis
+*.sentis.meta
+*.bvh
+*.bvh.meta
