@@ -12,8 +12,8 @@ namespace CutKungfu.Tests
         [TestCase(1, 1.0f)]
         [TestCase(2, 1.6f)]
         [TestCase(3, 2.4f)]
-        [TestCase(4, 3.5f)]
-        public void PowerMultiplier_FollowsGddTable(int poses, float expected)
+        [TestCase(4, 2.8f)] // GDD の仮値は 3.5。範囲技1つ+単体技3つで包囲を全滅できたため 2.8 に下げた
+        public void PowerMultiplier_FollowsTheTable(int poses, float expected)
             => Assert.That(CutRules.PowerMultiplier(T, poses), Is.EqualTo(expected).Within(1e-5f));
 
         [TestCase(1, 0.5f)]
@@ -100,7 +100,7 @@ namespace CutKungfu.Tests
         {
             float one = CutRules.StrikeDamage(T, BrickKind.Palm, 1);
             float four = CutRules.StrikeDamage(T, BrickKind.Palm, 4);
-            Assert.That(four / one, Is.EqualTo(3.5f).Within(1e-4f));
+            Assert.That(four / one, Is.EqualTo(2.8f).Within(1e-4f));
         }
 
         [Test]
@@ -161,6 +161,17 @@ namespace CutKungfu.Tests
             float focus2 = CutRules.StrikeDamage(t, BrickKind.Palm, 2) + CutRules.StrikeDamage(t, BrickKind.FlyingKick, 2);
             Assert.That(focus2, Is.LessThan(t.EnemyMaxHealth), "2ポーズでは倒しきれない");
         }
+        /// <summary>4個目を置く得が残る: 別々のブリックで、4個技の合計ダメージが3個技の合計を上回る。</summary>
+        [Test]
+        public void FourPoseCut_StillOutdamagesThreePoseCut()
+        {
+            var kinds = new[] { BrickKind.Palm, BrickKind.FlyingKick, BrickKind.Spin, BrickKind.TableLanding };
+            float four = 0f, three = 0f;
+            for (int i = 0; i < 4; i++) four += CutRules.StrikeDamage(T, kinds[i], 4);
+            for (int i = 0; i < 3; i++) three += CutRules.StrikeDamage(T, kinds[i], 3);
+            Assert.That(four, Is.GreaterThan(three));
+        }
+
         [Test]
         public void AreaDamageCap_LimitsTheTotalAnAreaBrickDealsToOneEnemyPerCut()
         {

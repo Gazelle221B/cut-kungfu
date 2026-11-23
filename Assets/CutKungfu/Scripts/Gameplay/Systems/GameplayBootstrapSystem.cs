@@ -9,7 +9,8 @@ namespace CutKungfu.Gameplay
     [UpdateInGroup(typeof(InitializationSystemGroup), OrderFirst = true)]
     public partial struct GameplayBootstrapSystem : ISystem
     {
-        [Unity.Burst.BurstCompile]
+        // Burst にしない: 一度しか走らず、Burst だと Tuning.Default の値が定数として埋め込まれる。
+        // Core だけを変えたとき Editor の Burst が古い値のまま使い続けることがあった(倍率を変えてもテストのワールドが古い値になった)
         public void OnCreate(ref SystemState state)
         {
             var em = state.EntityManager;

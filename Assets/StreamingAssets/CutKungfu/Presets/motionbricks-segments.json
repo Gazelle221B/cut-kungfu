@@ -21,7 +21,7 @@
             "x": 1.0,
             "y": 1.6,
             "z": 2.4,
-            "w": 3.5
+            "w": 2.8
         },
         "CutBaseDamage": 20.0,
         "CutDashSpeed": 16.0,
@@ -107,6 +107,7 @@
         "EnemyKnockback": 5.0,
         "EnemyHitStun": 0.3,
         "EnemyCutHitStun": 0.8,
+        "EnemyAreaHitStun": 0.8,
         "EnemyStaggerOnParry": 1.2,
         "EnemyMaxConcurrentWindups": 2,
         "HitStopLight": 0.05,

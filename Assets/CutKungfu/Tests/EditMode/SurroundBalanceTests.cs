@@ -66,22 +66,15 @@ namespace CutKungfu.Tests
             public string Name;
             public float3 Player;
             public float[] EnemyAngles;
-            /// <summary>
-            /// 既知の問題(範囲技+単体技): ゲージ60(4個技)で、範囲技1つで3体を削り、単体技3つを別々の敵に当てて1体ずつとどめを刺すと全滅できる
-            /// (机の左脇 2通り、机の手前 3通り)。範囲技の上限の対象外の打撃で起きるため、直し方の判断待ち。
-            /// 深刻さ(Measure_KnownWipes_UnderEnemyPressure、種 20 通り×5並び): 敵の攻撃開始を乱数で振っても、待ちのみなら 100 回中 96 回、
-            /// 技を出す時点で予備動作中の敵を含めても 85 回は出し切って全滅。中断は 0 回 / 9 回で、いずれも攻撃直前の敵が最初の範囲技より先に殴った場合。
-            /// </summary>
-            public bool KnownWipeByAreaThenThreeFinishers;
             public override string ToString() => Name;
         }
 
         static readonly SurroundSetup[] Setups =
         {
             // 机(x 1.8〜4.2, z 0.2〜1.4)の左脇。机上の着地の範囲(半径2.0)に3体とも入る
-            new SurroundSetup { Name = "机の左脇", Player = new float3(1.2f, 0f, 0.8f), EnemyAngles = new[] { 90f, 210f, 330f }, KnownWipeByAreaThenThreeFinishers = true },
+            new SurroundSetup { Name = "机の左脇", Player = new float3(1.2f, 0f, 0.8f), EnemyAngles = new[] { 90f, 210f, 330f } },
             // 机の手前。机の上からは手前の1体に届きにくい
-            new SurroundSetup { Name = "机の手前", Player = new float3(3f, 0f, -1.0f), EnemyAngles = new[] { 180f, 270f, 0f }, KnownWipeByAreaThenThreeFinishers = true },
+            new SurroundSetup { Name = "机の手前", Player = new float3(3f, 0f, -1.0f), EnemyAngles = new[] { 180f, 270f, 0f } },
             // 机に届かない(到達6mの外)。机上の着地は置けない
             new SurroundSetup { Name = "机に届かない", Player = new float3(-6f, 0f, 0f), EnemyAngles = new[] { 90f, 210f, 330f } },
         };
@@ -136,14 +129,7 @@ namespace CutKungfu.Tests
         {
             foreach (var setup in Setups)
             foreach (var gauge in new[] { 50f, 60f })
-            {
-                var data = new TestCaseData(setup, gauge).SetName($"AreaThenPalmFinish_CannotWipeTheSurround({setup.Name}, ゲージ{gauge})");
-                if (setup.KnownWipeByAreaThenThreeFinishers && gauge >= 60f)
-                    data = data.Ignore("既知の問題: ゲージ60(4個技)で、範囲技1つ+単体技3つを別々の敵に当てると全滅できる(机の左脇2通り・机の手前3通り)。" +
-                                       "敵の攻撃開始を乱数で振っても100回中96回(予備動作中の敵を含めて85回)は出し切って全滅、中断は0回(9回)" +
-                                       "(Measure_KnownWipes_UnderEnemyPressure)。直し方が決まったら外す");
-                yield return data;
-            }
+                yield return new TestCaseData(setup, gauge).SetName($"AreaThenPalmFinish_CannotWipeTheSurround({setup.Name}, ゲージ{gauge})");
         }
 
         /// <summary>
@@ -268,7 +254,7 @@ namespace CutKungfu.Tests
         public void Measure_KnownWipes_CountermeasureGrid()
         {
             var report = new StringBuilder();
-            report.Append("範囲技の被弾硬直 | 4個技の倍率 | 出し切って全滅 | 途中で中断 | 出し切ったが全滅せず | 全滅率 | 散らした4個で全滅できない | 1体に集中で3個撃破 | 飛び蹴りでとどめ | 4個技>3個技\n");
+            report.Append("範囲技の被弾硬直 | 4個技の倍率 | 出し切って全滅 | 途中で中断 | 出し切ったが全滅せず | 全滅率 | 散らした4個で全滅できない | 1体に集中で3個撃破 | 飛び蹴りでとどめ | 4個技>3個技 | 全滅の内訳(配置:並び=件数)\n");
             foreach (float areaStun in new[] { 0.8f, 0.3f, 0f })
             foreach (float power4 in new[] { 3.5f, 3.0f, 2.8f })
             {
@@ -277,20 +263,25 @@ namespace CutKungfu.Tests
                 tuning.PowerByPoseCount.w = power4;
 
                 int wiped = 0, interrupted = 0, survived = 0, runs = 0;
+                var breakdown = new StringBuilder();
                 foreach (var (setupIndex, seq) in KnownWipes)
+                {
+                int wipedHere = 0;
                 for (int seed = 1; seed <= PressureSeeds; seed++)
                 {
                     var r = RunUnderPressure(Setups[setupIndex], seq, seed, includeWindups: true, tuning);
                     if (!r.Placed) continue;
                     runs++;
                     if (r.Interrupted) interrupted++;
-                    else if (r.Alive == 0) wiped++;
+                    else if (r.Alive == 0) { wiped++; wipedHere++; }
                     else survived++;
+                }
+                if (wipedHere > 0) breakdown.Append($"{Setups[setupIndex].Name}:{BrickSequence.ToCodeString(Pack(seq))}={wipedHere} ");
                 }
 
                 var p = CheckPremises(tuning);
                 report.Append($"{areaStun:0.0} | {power4:0.0} | {wiped} | {interrupted} | {survived} | {(runs > 0 ? 100f * wiped / runs : 0f):0}% | ")
-                      .Append($"{Mark(p.SpreadCannotWipe)} | {Mark(p.FocusThreeKills)} | {Mark(p.FlyingKickFinishes)} | {Mark(p.FourBeatsThree)}\n");
+                      .Append($"{Mark(p.SpreadCannotWipe)} | {Mark(p.FocusThreeKills)} | {Mark(p.FlyingKickFinishes)} | {Mark(p.FourBeatsThree)} | {breakdown.ToString().Trim()}\n");
             }
 
             TestContext.WriteLine(report.ToString());
@@ -350,8 +341,9 @@ namespace CutKungfu.Tests
             public int Alive;
             public bool WindupDuringExecution;
             public int HitsDuringExecution;
+            public string Health;
 
-            public string Outcome => !Placed ? "置けず" : Interrupted ? "途中で中断" : Alive == 0 ? "出し切って全滅" : $"出し切ったが {Alive} 体残る";
+            public string Outcome => (!Placed ? "置けず" : Interrupted ? "途中で中断" : Alive == 0 ? "出し切って全滅" : $"出し切ったが {Alive} 体残る") + $" [{Health}]";
         }
 
         static PressureResult RunUnderPressure(SurroundSetup setup, BrickKind[] seq, int seed, bool includeWindups, in Tuning tuning)
@@ -405,6 +397,9 @@ namespace CutKungfu.Tests
                 if (t.Value.Kind == PlaytestEventKind.Cut && t.Value.Interrupted) result.Interrupted = true;
             }
             result.Alive = w.AliveEnemies();
+            var hp = new StringBuilder();
+            foreach (var e in w.Enemies()) hp.Append(w.Em.GetComponentData<Fighter>(e).Health.ToString("0.0")).Append(" ");
+            result.Health = hp.ToString().Trim();
             return result;
         }
 
@@ -526,17 +521,23 @@ namespace CutKungfu.Tests
             Assert.That(w.AliveEnemies(), Is.Zero, label);
         }
 
-        /// <summary>1回の技で3体撃破した件数は、CSV の kind=cut 行の kills 列で数えられる(既知の全滅の並びで確かめる)。</summary>
+        /// <summary>
+        /// 1回の技で3体撃破した件数は、CSV の kind=cut 行の kills 列で数えられる。
+        /// 包囲の3体を体力10まで減らしておき、回し蹴り1発(16)で3体とも倒して確かめる。
+        /// </summary>
         [Test]
         public void ThreeKillCut_IsRecordedAsKillsThree()
         {
-            var (setupIndex, seq) = KnownWipes[1];
-            var setup = Setups[setupIndex];
+            var setup = Setups[2]; // 机に届かない包囲
             using var w = SurroundedAt(setup);
-            w.AddTable(GameplayTestWorld.StageTable);
             w.Step();
-            w.SetGauge(60f);
-            w.PerformCut(PosesFor(setup, seq));
+            foreach (var e in w.Enemies())
+            {
+                var f = w.Em.GetComponentData<Fighter>(e);
+                f.Health = 10f;
+                w.Em.SetComponentData(e, f);
+            }
+            w.PerformCut((S, setup.Player));
 
             PlaytestEvent cutRow = default;
             bool found = false;
