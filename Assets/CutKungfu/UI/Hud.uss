@@ -1,0 +1,248 @@
+/* 1970年代カンフー映画のパレット: クリーム / トマトレッド / マスタード / くすんだティール */
+:root {
+    --cream: #F3E6C8;
+    --ink: #1B1714;
+    --tomato: #D9452B;
+    --mustard: #E0A82E;
+    --teal: #4F8A8B;
+    --cyan: #A9F0FF;
+    --danger: #FF5A3C;
+}
+
+.root {
+    position: absolute;
+    left: 0; top: 0; right: 0; bottom: 0;
+    color: var(--cream);
+    font-size: 16px;
+}
+
+.world-layer {
+    position: absolute;
+    left: 0; top: 0; right: 0; bottom: 0;
+}
+
+/* --- カチンコ --- */
+.clapper {
+    position: absolute;
+    left: 20px; top: 18px;
+    width: 300px;
+}
+.clapper__stripes {
+    height: 16px;
+    background-color: var(--ink);
+    border-top-left-radius: 4px;
+    border-top-right-radius: 4px;
+    border-bottom-width: 3px;
+    border-bottom-color: var(--cream);
+}
+.clapper__body {
+    background-color: rgba(27, 23, 20, 0.88);
+    padding: 8px 12px;
+    border-bottom-left-radius: 4px;
+    border-bottom-right-radius: 4px;
+}
+.clapper__title {
+    font-size: 13px;
+    color: var(--mustard);
+    -unity-font-style: bold;
+    letter-spacing: 3px;
+}
+.clapper__row {
+    flex-direction: row;
+    justify-content: space-between;
+    margin-top: 2px;
+}
+.clapper__cell {
+    font-size: 18px;
+    -unity-font-style: bold;
+}
+.clapper__cell--take { color: var(--tomato); }
+.clapper__condition {
+    font-size: 13px;
+    color: var(--teal);
+    margin-top: 2px;
+}
+
+/* --- 映え --- */
+.score {
+    position: absolute;
+    right: 24px; top: 20px;
+    align-items: flex-end;
+}
+.score__caption { font-size: 14px; color: var(--mustard); }
+.score__value { font-size: 34px; -unity-font-style: bold; }
+
+/* --- メーター --- */
+.meters {
+    position: absolute;
+    left: 20px; bottom: 44px;
+    width: 360px;
+}
+.meter {
+    flex-direction: row;
+    align-items: center;
+    margin-top: 6px;
+}
+.meter__caption { width: 70px; font-size: 14px; -unity-text-align: middle-right; padding-right: 8px; }
+.meter__track {
+    flex-grow: 1;
+    height: 14px;
+    background-color: rgba(27, 23, 20, 0.85);
+    border-width: 2px;
+    border-color: var(--ink);
+    overflow: hidden;
+}
+.meter__track--film { height: 18px; }
+.meter__fill {
+    position: absolute;
+    left: 0; top: 0; bottom: 0;
+    width: 100%;
+}
+.meter__fill--hp { background-color: var(--tomato); }
+.meter__fill--film { background-color: var(--mustard); }
+.meter__cost {
+    position: absolute;
+    top: 0; bottom: 0;
+    width: 0;
+    background-color: rgba(169, 240, 255, 0.75);
+}
+.meter__threshold {
+    position: absolute;
+    top: -2px; bottom: -2px;
+    width: 2px;
+    background-color: var(--cream);
+}
+.meter__value { width: 46px; font-size: 14px; padding-left: 6px; }
+
+/* --- スロー中のパネル --- */
+.slow-panel {
+    position: absolute;
+    left: 0; right: 0; bottom: 40px;
+    align-items: center;
+    display: none;
+}
+.slow-panel--visible { display: flex; }
+.slow-panel__timer {
+    width: 420px;
+    height: 6px;
+    background-color: rgba(27, 23, 20, 0.7);
+    margin-bottom: 8px;
+}
+.slow-panel__timer-fill {
+    position: absolute;
+    left: 0; top: 0; bottom: 0;
+    width: 100%;
+    background-color: var(--cream);
+}
+.bricks { flex-direction: row; }
+.brick {
+    width: 104px;
+    height: 54px;
+    margin: 0 4px;
+    padding: 4px 6px;
+    background-color: rgba(27, 23, 20, 0.85);
+    border-width: 2px;
+    border-color: rgba(243, 230, 200, 0.25);
+    border-radius: 4px;
+    justify-content: center;
+}
+.brick--selected {
+    border-color: var(--cyan);
+    background-color: rgba(79, 138, 139, 0.9);
+}
+.brick__key { font-size: 12px; color: var(--mustard); }
+.brick__name { font-size: 15px; -unity-font-style: bold; }
+.slow-panel__summary {
+    flex-direction: row;
+    align-items: flex-end;
+    margin-top: 8px;
+}
+.slow-panel__big { font-size: 30px; -unity-font-style: bold; color: var(--cyan); margin-right: 16px; }
+.slow-panel__stat { font-size: 18px; margin-right: 16px; }
+.slow-panel__stat--commit { color: var(--danger); -unity-font-style: bold; }
+.slow-panel__hint { font-size: 13px; color: rgba(243, 230, 200, 0.75); margin-top: 4px; }
+
+/* --- 大見出し(NG! / カット!OK / テイク) --- */
+.banner {
+    position: absolute;
+    left: 0; right: 0; top: 30%;
+    align-items: center;
+    display: none;
+}
+.banner--visible { display: flex; }
+.banner__text {
+    font-size: 96px;
+    -unity-font-style: bold;
+    color: var(--cream);
+    -unity-text-outline-width: 3px;
+    -unity-text-outline-color: var(--ink);
+}
+.banner__text--ng { color: var(--tomato); }
+.banner__text--ok { color: var(--mustard); }
+.banner__sub {
+    font-size: 22px;
+    background-color: rgba(27, 23, 20, 0.85);
+    padding: 4px 14px;
+    margin-top: 4px;
+}
+
+/* --- 集計 --- */
+.stats {
+    position: absolute;
+    right: 20px; top: 110px;
+    width: 380px;
+    padding: 10px 12px;
+    background-color: rgba(27, 23, 20, 0.88);
+    border-radius: 4px;
+    display: none;
+}
+.stats--visible { display: flex; }
+.stats__title { font-size: 15px; color: var(--mustard); -unity-font-style: bold; margin-bottom: 4px; }
+.stats__body { font-size: 14px; white-space: normal; }
+
+.help {
+    position: absolute;
+    left: 20px; right: 20px; bottom: 10px;
+    font-size: 12px;
+    color: rgba(243, 230, 200, 0.7);
+    -unity-text-align: middle-center;
+}
+
+/* --- ワールド座標に追従するラベル --- */
+.world-label {
+    position: absolute;
+    translate: -50% -100%;
+    font-size: 16px;
+    -unity-font-style: bold;
+    -unity-text-outline-width: 1px;
+    -unity-text-outline-color: var(--ink);
+}
+.world-label--eta { color: var(--cream); background-color: rgba(27, 23, 20, 0.7); padding: 0 5px; border-radius: 3px; }
+.world-label--soon { color: var(--danger); }
+.world-label--windup { color: #FFFFFF; background-color: var(--danger); }
+.world-label--ghost { color: var(--ink); background-color: var(--cyan); padding: 0 6px; border-radius: 10px; font-size: 15px; }
+.world-label--popup { font-size: 22px; translate: -50% -50%; }
+.world-label--popup-cut { color: var(--cyan); font-size: 26px; }
+.world-label--popup-hurt { color: var(--danger); }
+.world-label--popup-parry { color: var(--mustard); font-size: 28px; }
+
+/* 足元のフィルム帯: 解除後の硬直を1コマ=0.1秒で予告する */
+.film-strip {
+    position: absolute;
+    translate: -50% 0;
+    flex-direction: row;
+    align-items: center;
+    padding: 3px 4px;
+    background-color: var(--ink);
+    border-top-width: 2px;
+    border-bottom-width: 2px;
+    border-color: var(--cream);
+}
+.film-strip__frame {
+    width: 9px;
+    height: 12px;
+    margin: 0 1px;
+    background-color: var(--danger);
+}
+.film-strip__frame--spent { background-color: rgba(255, 90, 60, 0.2); }
+.film-strip__label { font-size: 13px; color: var(--cream); margin-left: 5px; -unity-font-style: bold; }

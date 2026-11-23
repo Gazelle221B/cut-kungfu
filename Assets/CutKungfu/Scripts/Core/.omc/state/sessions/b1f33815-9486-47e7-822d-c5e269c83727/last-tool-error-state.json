@@ -1,0 +1,7 @@
+{
+  "tool_name": "Bash",
+  "tool_input_preview": "{\"command\":\"cd \\\"D:/_Development/UnityProjects/cut-kungfu/Assets/CutKungfu/Scripts/Core\\\" && python - <<'EOF' 2>/dev/null || node -e \\\"\\nconst fs=require('fs');let s=fs.readFileSync('CutRules.cs','utf...",
+  "error": "Exit code 1\n/usr/bin/bash: line 28: warning: here-document at line 27 delimited by end-of-file (wanted `EOF')\n/usr/bin/bash: command substitution: line 1: syntax error near unexpected token `newline'\n/usr/bin/bash: command substitution: line 1: `        /// <summary>'\n[eval]:5\r\nconst repl=;\r\n           ^\r\n\r\nSyntaxError: Unexpected token ';'\r\n    at makeContextifyScript (node:internal/vm:185:14)\r\n    at node:internal/process/execution:107:22\r\n    at [eval]-wrapper:6:24\r\n    at runScript (node:int...",
+  "timestamp": "2026-11-22T18:06:15.741Z",
+  "retry_count": 1
+}

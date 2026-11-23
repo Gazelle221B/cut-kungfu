@@ -1,0 +1,67 @@
+<ui:UXML xmlns:ui="UnityEngine.UIElements">
+    <Style src="Hud.uss" />
+    <ui:VisualElement name="root" class="root" picking-mode="Ignore">
+        <ui:VisualElement name="world-layer" class="world-layer" picking-mode="Ignore" />
+
+        <ui:VisualElement name="clapper" class="clapper" picking-mode="Ignore">
+            <ui:VisualElement class="clapper__stripes" />
+            <ui:VisualElement class="clapper__body">
+                <ui:Label name="clapper-title" class="clapper__title" text="CUT! KUNGFU" />
+                <ui:VisualElement class="clapper__row">
+                    <ui:Label name="clapper-wave" class="clapper__cell" text="SCENE 1 / WAVE 1" />
+                    <ui:Label name="clapper-take" class="clapper__cell clapper__cell--take" text="TAKE 1" />
+                </ui:VisualElement>
+                <ui:Label name="clapper-condition" class="clapper__condition" text="条件: コミット時間 ON" />
+            </ui:VisualElement>
+        </ui:VisualElement>
+
+        <ui:VisualElement name="score" class="score" picking-mode="Ignore">
+            <ui:Label class="score__caption" text="映え" />
+            <ui:Label name="score-value" class="score__value" text="0" />
+        </ui:VisualElement>
+
+        <ui:VisualElement name="meters" class="meters" picking-mode="Ignore">
+            <ui:VisualElement class="meter">
+                <ui:Label class="meter__caption" text="体力" />
+                <ui:VisualElement class="meter__track">
+                    <ui:VisualElement name="hp-fill" class="meter__fill meter__fill--hp" />
+                </ui:VisualElement>
+            </ui:VisualElement>
+            <ui:VisualElement class="meter">
+                <ui:Label class="meter__caption" text="フィルム" />
+                <ui:VisualElement name="gauge-track" class="meter__track meter__track--film">
+                    <ui:VisualElement name="gauge-fill" class="meter__fill meter__fill--film" />
+                    <ui:VisualElement name="gauge-cost" class="meter__cost" />
+                    <ui:VisualElement name="gauge-threshold" class="meter__threshold" />
+                </ui:VisualElement>
+                <ui:Label name="gauge-label" class="meter__value" text="100" />
+            </ui:VisualElement>
+        </ui:VisualElement>
+
+        <ui:VisualElement name="slow-panel" class="slow-panel" picking-mode="Ignore">
+            <ui:VisualElement name="slow-timer-track" class="slow-panel__timer">
+                <ui:VisualElement name="slow-timer-fill" class="slow-panel__timer-fill" />
+            </ui:VisualElement>
+            <ui:VisualElement name="bricks" class="bricks" />
+            <ui:VisualElement class="slow-panel__summary">
+                <ui:Label name="pose-count" class="slow-panel__big" text="0 / 4" />
+                <ui:Label name="multiplier" class="slow-panel__stat" text="威力 ×0.0" />
+                <ui:Label name="commit-preview" class="slow-panel__stat slow-panel__stat--commit" text="硬直 0.0s" />
+            </ui:VisualElement>
+            <ui:Label name="slow-hint" class="slow-panel__hint" text="クリック/J: 置く　右クリック/K: 戻す　Space: 切る" />
+        </ui:VisualElement>
+
+        <ui:VisualElement name="banner" class="banner" picking-mode="Ignore">
+            <ui:Label name="banner-text" class="banner__text" text="" />
+            <ui:Label name="banner-sub" class="banner__sub" text="" />
+        </ui:VisualElement>
+
+        <ui:VisualElement name="stats" class="stats" picking-mode="Ignore">
+            <ui:Label class="stats__title" text="プレイテスト集計 (F2)" />
+            <ui:Label name="stats-body" class="stats__body" text="" />
+        </ui:VisualElement>
+
+        <ui:Label name="help" class="help" picking-mode="Ignore"
+                  text="WASD 移動　J/左クリック 攻撃　K/右クリック 捌き　Shift/L 回避　Space 止める・切る　1-4/ホイール ブリック選択　R テイクし直し　N 次のウェーブ　F1 条件切替　F2 集計" />
+    </ui:VisualElement>
+</ui:UXML>
