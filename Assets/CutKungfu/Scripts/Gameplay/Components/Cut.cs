@@ -45,6 +45,7 @@ namespace CutKungfu.Gameplay
         public PlaytestEvent Record;
 
         /// <summary>解除を受け付けたが、動きの計画が揃うのを待っている(スローのまま)。</summary>
+        /// <remarks>待っている間も Phase は Slow のままで、被弾の扱いはスロー中と同じ(CutControlSystem のコメント参照)。</remarks>
         public bool ReleasePending;
         /// <summary>解除待ちの経過(実時間)。</summary>
         public float ReleaseWaitReal;

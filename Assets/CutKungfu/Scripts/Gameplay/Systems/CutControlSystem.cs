@@ -84,7 +84,12 @@ namespace CutKungfu.Gameplay
             {
                 cut.InputConsumed = true; // スロー中の押下は「置く・戻す」であって攻撃・捌きではない
                 cut.SlowRealElapsed += clock.RealDeltaTime;
-                // 解除待ちの間は配置を締め切る
+                // 解除待ちの間は配置を締め切る。
+                // 被弾について(現在の実装): 解除待ちの間も CutPhase.Slow のままなので、ゲーム時間はスロー倍率で進み、
+                // 被弾の扱いは「スロー中」と同じになる。既定の InvulnerableDuringSlow=true では殴られない(DamageSystem)。
+                // false にした場合は殴られてダメージと被弾硬直を受けるが、解除待ちは続く。計画が揃って(または待ちの上限で代替に切り替えて)切ると、
+                // 同じ更新で CutExecutionSystem が被弾硬直を見て技を出だしで中断する(記録は interrupted=1)。
+                // MotionPlanningTests.WhileWaitingForPlans_* で固定している。
                 if (!cut.ReleasePending) UpdateSlow(ref state, player, ref cut, ref gauge, input, tuning, table, fighter.Facing, playerPos);
 
                 bool timeUp = cut.SlowRealElapsed >= tuning.SlowMaxRealSeconds;

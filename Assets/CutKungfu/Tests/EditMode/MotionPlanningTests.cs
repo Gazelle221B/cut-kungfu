@@ -175,6 +175,61 @@ namespace CutKungfu.Tests
             Assert.That(_fallback.ActivePlans, Is.Zero);
         }
 
+        void QueueEnemyStrikeAtPlayer()
+        {
+            var enemy = _w.Em.CreateEntityQuery(typeof(EnemyTag)).GetSingletonEntity();
+            float2 at = _w.Em.GetComponentData<Unity.Transforms.LocalTransform>(_w.Player).Position.xz;
+            _w.Em.GetBuffer<DamageRequest>(_w.Em.CreateEntityQuery(typeof(DamageRequest)).GetSingletonEntity()).Add(new DamageRequest
+            {
+                Attacker = enemy, AttackerTeam = Team.Enemy, Kind = StrikeKind.EnemyStrike,
+                A = at, B = at, Radius = 1f, Damage = 12f, HitStun = Tuning.Default.PlayerHitStun,
+            });
+        }
+
+        /// <summary>解除待ちの間はまだスロー(CutPhase.Slow)なので、既定の InvulnerableDuringSlow=true に従って殴られない。</summary>
+        [Test]
+        public void WhileWaitingForPlans_PlayerIsNotHit_ByDefault()
+        {
+            UseDeferredSource();
+            EnterSlowAndPlace(1);
+            Release();
+            Assert.That(Cut.ReleasePending, Is.True);
+
+            QueueEnemyStrikeAtPlayer();
+            _w.Step();
+            Assert.That(_w.Em.GetComponentData<Fighter>(_w.Player).Health, Is.EqualTo(Tuning.Default.PlayerMaxHealth));
+            Assert.That(Cut.Phase, Is.EqualTo(CutPhase.Slow));
+        }
+
+        /// <summary>
+        /// InvulnerableDuringSlow を切ると、解除待ちの間にも殴られる。解除待ちはそのまま続き、
+        /// 計画が揃って切った瞬間に被弾硬直が残っているので、技は出だしで中断される(記録は interrupted=1)。
+        /// </summary>
+        [Test]
+        public void WhileWaitingForPlans_WithSlowInvulnerabilityOff_HitLands_AndTheCutIsInterruptedOnRelease()
+        {
+            var tuning = _w.Singleton<TuningSingleton>();
+            tuning.Value.InvulnerableDuringSlow = false;
+            _w.SetSingleton(tuning);
+
+            UseDeferredSource();
+            EnterSlowAndPlace(1);
+            Release();
+            QueueEnemyStrikeAtPlayer();
+            _w.Step();
+            Assert.That(_w.Em.GetComponentData<Fighter>(_w.Player).Health, Is.LessThan(Tuning.Default.PlayerMaxHealth), "解除待ちでも殴られる");
+            Assert.That(Cut.Phase, Is.EqualTo(CutPhase.Slow));
+            Assert.That(Cut.ReleasePending, Is.True, "殴られても解除待ちは続く");
+
+            _deferred.CompleteAll();
+            _w.Step();
+            Assert.That(Cut.Phase, Is.EqualTo(CutPhase.None), "切った同じ更新で、被弾硬直により中断される");
+            bool interrupted = false;
+            foreach (var e in _w.Em.GetBuffer<TelemetryEvent>(_w.Em.CreateEntityQuery(typeof(TelemetryEvent)).GetSingletonEntity()))
+                if (e.Value.Kind == PlaytestEventKind.Cut && e.Value.Interrupted) interrupted = true;
+            Assert.That(interrupted, Is.True);
+        }
+
         [Test]
         public void ExecutionUsesTheGeneratorsLength_AndStrikesAtItsContactTime()
         {
