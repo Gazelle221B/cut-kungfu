@@ -4,6 +4,7 @@
     "references": [
         "CutKungfu.Core",
         "CutKungfu.Gameplay",
+        "CutKungfu.Presentation",
         "Unity.Entities",
         "Unity.Transforms",
         "Unity.Mathematics",

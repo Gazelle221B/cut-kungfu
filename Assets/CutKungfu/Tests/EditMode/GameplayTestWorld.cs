@@ -12,7 +12,10 @@ namespace CutKungfu.Tests
 {
     /// <summary>
     /// 描画も入力デバイスも無い ECS ワールドに、ゲームロジックのシステム一式とシナリオを組む。
-    /// 入力は PlayerInput シングルトンに直接書く。結合テストが共通で使う。
+    /// 入力は PlayerInput シングルトンに書く(InputBridgeSystem と同じく、まだ使われていない押下に重ねる)。結合テストが共通で使う。
+    /// 既定では、1回の Step でゲームロジックをちょうど1回、<see cref="StepDt"/> だけ進める(dt を変えた比較のため)。
+    /// fixedStep を true にすると実行時と同じく固定タイムステップ(60Hz)で回し、表示の補間も入れる。
+    /// このときの Step は「描画の1フレーム」で、ゲームロジックは 0 回のことも複数回のこともある。
     /// </summary>
     public sealed class GameplayTestWorld : IDisposable
     {
@@ -20,23 +23,43 @@ namespace CutKungfu.Tests
         public readonly EntityManager Em;
         public readonly Entity Player;
 
-        public GameplayTestWorld(float3 playerStart, params float3[] enemySpawns)
+        public readonly bool FixedStep;
+
+        public GameplayTestWorld(float3 playerStart, params float3[] enemySpawns) : this(false, playerStart, enemySpawns)
         {
+        }
+
+        public GameplayTestWorld(bool fixedStep, float3 playerStart, params float3[] enemySpawns)
+        {
+            FixedStep = fixedStep;
             World = new World("CutKungfu.Tests");
             Em = World.EntityManager;
 
             var init = World.GetOrCreateSystemManaged<InitializationSystemGroup>();
             init.AddSystemToUpdateList(World.CreateSystem<GameplayBootstrapSystem>());
             var sim = World.GetOrCreateSystemManaged<SimulationSystemGroup>();
+            sim.AddSystemToUpdateList(World.GetOrCreateSystemManaged<BeginSimulationEntityCommandBufferSystem>());
+            // 実行時と同じく、ゲームロジックは FixedStepSimulationSystemGroup の中に置く
+            var fixedGroup = World.GetOrCreateSystemManaged<FixedStepSimulationSystemGroup>();
+            sim.AddSystemToUpdateList(fixedGroup);
+            if (fixedStep) fixedGroup.Timestep = GameplaySystemGroup.StepSeconds;
+            else fixedGroup.RateManager = null; // Step ごとにちょうど1回、渡した dt で回す
             var gameplay = World.GetOrCreateSystemManaged<GameplaySystemGroup>();
-            sim.AddSystemToUpdateList(gameplay);
+            fixedGroup.AddSystemToUpdateList(gameplay);
             foreach (var t in new[]
                      {
                          typeof(SessionSystem), typeof(GameClockSystem), typeof(FighterTimersSystem), typeof(CutControlSystem),
                          typeof(CutExecutionSystem), typeof(PlayerControlSystem), typeof(EnemyAISystem), typeof(DamageSystem),
                          typeof(BodyMotionSystem), typeof(DyingSystem), typeof(StrikeFxSystem), typeof(CharacterColorSystem),
+                         typeof(PlayerInputConsumeSystem),
                      })
                 gameplay.AddSystemToUpdateList(World.CreateSystem(t));
+            if (fixedStep)
+            {
+                fixedGroup.AddSystemToUpdateList(World.CreateSystem<CutKungfu.Presentation.SmoothingRestoreSystem>());
+                fixedGroup.AddSystemToUpdateList(World.CreateSystem<CutKungfu.Presentation.SmoothingCaptureSystem>());
+                sim.AddSystemToUpdateList(World.CreateSystem<CutKungfu.Presentation.SmoothingApplySystem>());
+            }
 
             // 実行時と同じく、トランスフォーム更新も同じグループに置く。
             // 無いと GameplaySystemGroup の [UpdateBefore(TransformSystemGroup)] が「対象がいない」として無視され、警告が出る
@@ -65,7 +88,7 @@ namespace CutKungfu.Tests
             if (dt < 0f) dt = StepDt;
             World.SetTime(new TimeData(World.Time.ElapsedTime + dt, dt));
             var q = Em.CreateEntityQuery(typeof(PlayerInput));
-            if (q.CalculateEntityCount() > 0) q.SetSingleton(input);
+            if (q.CalculateEntityCount() > 0) q.SetSingleton(PlayerInput.Accumulate(q.GetSingleton<PlayerInput>(), input));
             World.GetExistingSystemManaged<InitializationSystemGroup>().Update();
             World.GetExistingSystemManaged<SimulationSystemGroup>().Update();
         }
