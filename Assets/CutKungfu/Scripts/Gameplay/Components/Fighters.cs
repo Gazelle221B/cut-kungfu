@@ -19,6 +19,11 @@ namespace CutKungfu.Gameplay
         /// <summary>XZ の向き(正規化)。</summary>
         public float3 Facing;
         public float HitStun;
+        /// <summary>
+        /// この更新のうち、被弾硬直が明けていた時間(FighterTimersSystem が書く)。
+        /// 硬直が更新の途中で明けたとき、明けた後の分だけ行動を進めるために使う。
+        /// </summary>
+        public float FreeTime;
         public float Invulnerable;
         /// <summary>被弾フラッシュの残り時間。</summary>
         public float Flash;

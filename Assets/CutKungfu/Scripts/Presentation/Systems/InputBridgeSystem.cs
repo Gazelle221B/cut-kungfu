@@ -10,6 +10,7 @@ namespace CutKungfu.Presentation
     /// <summary>
     /// Input System の状態を、デバイスに依存しない <see cref="PlayerInput"/> に写す。
     /// ゲームロジックはこのシングルトンしか見ないので、入力の差し替え(リプレイ・自動テスト)が効く。
+    /// 押下は前のフレームのまだ使われていない分に重ねる(ゲームの更新が回らなかったフレームの押下を落とさない)。
     /// </summary>
     [UpdateInGroup(typeof(InitializationSystemGroup))]
     [UpdateAfter(typeof(GameplayBootstrapSystem))]
@@ -59,7 +60,7 @@ namespace CutKungfu.Presentation
             }
 
             StatsToggledThisFrame = _actions.ToggleStats.WasPressedThisFrame();
-            SystemAPI.SetSingleton(input);
+            SystemAPI.SetSingleton(PlayerInput.Accumulate(SystemAPI.GetSingleton<PlayerInput>(), input));
         }
 
         /// <summary>
