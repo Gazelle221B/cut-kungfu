@@ -1,0 +1,29 @@
+{
+    "name": "CutKungfu.Editor",
+    "rootNamespace": "CutKungfu.EditorTools",
+    "references": [
+        "CutKungfu.Core",
+        "CutKungfu.Gameplay",
+        "CutKungfu.Authoring",
+        "CutKungfu.Presentation",
+        "Unity.Entities",
+        "Unity.Entities.Hybrid",
+        "Unity.Entities.Graphics",
+        "Unity.Scenes",
+        "Unity.Collections",
+        "Unity.Mathematics",
+        "Unity.RenderPipelines.Core.Runtime",
+        "Unity.RenderPipelines.Universal.Runtime"
+    ],
+    "includePlatforms": [
+        "Editor"
+    ],
+    "excludePlatforms": [],
+    "allowUnsafeCode": false,
+    "overrideReferences": false,
+    "precompiledReferences": [],
+    "autoReferenced": false,
+    "defineConstraints": [],
+    "versionDefines": [],
+    "noEngineReferences": false
+}

@@ -1,0 +1,22 @@
+{
+    "name": "CutKungfu.Authoring",
+    "rootNamespace": "CutKungfu.Authoring",
+    "references": [
+        "CutKungfu.Core",
+        "CutKungfu.Gameplay",
+        "Unity.Entities",
+        "Unity.Entities.Hybrid",
+        "Unity.Collections",
+        "Unity.Transforms",
+        "Unity.Mathematics"
+    ],
+    "includePlatforms": [],
+    "excludePlatforms": [],
+    "allowUnsafeCode": false,
+    "overrideReferences": false,
+    "precompiledReferences": [],
+    "autoReferenced": false,
+    "defineConstraints": [],
+    "versionDefines": [],
+    "noEngineReferences": false
+}

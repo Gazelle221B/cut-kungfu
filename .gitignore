@@ -112,3 +112,23 @@ InitTestScene*.unity*
 
 # Auto-generated cache in Assets folder
 /[Aa]ssets/[Ss]ceneDependencyCache*
+
+# Cut Kungfu playtest logs (local only)
+/Playtests/
+
+# Local agent tooling state
+.omc/
+.concord/
+.specstory/
+
+# MotionBricks: models and sample motions are not committed
+# (sample motions are under an evaluation-only license; models are fetched separately)
+*.onnx
+*.onnx.meta
+*.sentis
+*.sentis.meta
+*.bvh
+*.bvh.meta
+
+# Chat transcript the TDD was extracted from (local only; docs/TDD_cut_kungfu_v0.1.md is the committed copy)
+meeting.md
