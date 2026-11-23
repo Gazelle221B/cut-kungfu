@@ -34,8 +34,7 @@ namespace CutKungfu.Gameplay
             {
                 ref var v = ref kb.ValueRW.Velocity;
                 if (math.lengthsq(v) < 0.0025f) { v = float3.zero; continue; }
-                lt.ValueRW.Position += v * dt;
-                v *= math.exp(-KnockbackDamping * dt);
+                lt.ValueRW.Position += Kinematics.DampedStep(ref v, KnockbackDamping, dt);
             }
 
             // 2) 押し合い(カット実行中の主人公はすり抜ける)
@@ -90,8 +89,7 @@ namespace CutKungfu.Gameplay
                     float floor = onTop ? table.TopY : 0f;
                     if (p.y > floor + 1e-3f)
                     {
-                        vb.VelocityY -= Gravity * dt;
-                        p.y += vb.VelocityY * dt;
+                        p.y += Kinematics.AcceleratedStep(ref vb.VelocityY, -Gravity, dt);
                         if (p.y <= floor) { p.y = floor; vb.VelocityY = 0f; }
                     }
                     else

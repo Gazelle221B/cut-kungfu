@@ -9,6 +9,8 @@ namespace CutKungfu.Gameplay
     /// <summary>
     /// 雑魚(素手)の行動: 間合いを詰める → 予備動作 → 殴る → 戻り。
     /// 同時に予備動作に入れる数を絞り、「誰が次に殴ってくるか」を読めるようにする(柱3)。
+    /// 状態のタイマーが更新の途中で切れたら、切れた後の時間は次の状態に持ち越す(切り替わりを更新の区切りに揃えない。
+    /// 揃えると、1回の更新が長いほど行動が遅れる)。
     /// </summary>
     [UpdateInGroup(typeof(GameplaySystemGroup))]
     [UpdateAfter(typeof(PlayerControlSystem))]
@@ -30,7 +32,6 @@ namespace CutKungfu.Gameplay
             if (SystemAPI.GetSingleton<SessionState>().Phase != SessionPhase.Playing) return;
 
             var tuning = SystemAPI.GetSingleton<TuningSingleton>().Value;
-            float dt = SystemAPI.GetSingleton<GameClock>().DeltaTime;
             var player = SystemAPI.GetSingletonEntity<PlayerTag>();
             float3 target = SystemAPI.GetComponent<LocalTransform>(player).Position;
             var requests = SystemAPI.GetSingletonBuffer<DamageRequest>();
@@ -62,6 +63,8 @@ namespace CutKungfu.Gameplay
                     }
                     continue;
                 }
+                // 硬直がこの更新の途中で明けたなら、明けた後の時間だけ動く
+                float dt = f.FreeTime;
 
                 // 技の打撃を受けた敵: 硬直が明けたら、残っていた待ちに倍率を掛ける(戻り中なら新しい待ちを引くときに掛ける)
                 if (brain.HitByCut && brain.State == EnemyState.Approach)
@@ -82,7 +85,8 @@ namespace CutKungfu.Gameplay
                         if (brain.Cooldown <= 0f && gap <= 0.35f && windups < tuning.EnemyMaxConcurrentWindups)
                         {
                             brain.State = EnemyState.Windup;
-                            brain.Timer = tuning.EnemyWindup;
+                            // 待ちがこの更新の途中で切れていたら、その後の時間は予備動作に回す(待たされていた分は回さない)
+                            brain.Timer = tuning.EnemyWindup - math.min(-brain.Cooldown, dt);
                             windups++;
                         }
                         break;
@@ -108,7 +112,7 @@ namespace CutKungfu.Gameplay
                                 FallbackDirection = f.Facing.xz,
                             });
                             brain.State = EnemyState.Recover;
-                            brain.Timer = tuning.EnemyRecover;
+                            brain.Timer += tuning.EnemyRecover;
                         }
                         break;
 
@@ -123,6 +127,7 @@ namespace CutKungfu.Gameplay
                                 brain.Cooldown *= tuning.EnemyWaitScaleAfterCutHit;
                                 brain.HitByCut = false;
                             }
+                            brain.Cooldown += brain.Timer;
                         }
                         break;
 
@@ -131,7 +136,7 @@ namespace CutKungfu.Gameplay
                         if (brain.Timer <= 0f)
                         {
                             brain.State = EnemyState.Approach;
-                            brain.Cooldown = brain.Random.NextFloat(tuning.EnemyCooldownMin, tuning.EnemyCooldownMax) * 0.5f;
+                            brain.Cooldown = brain.Random.NextFloat(tuning.EnemyCooldownMin, tuning.EnemyCooldownMax) * 0.5f + brain.Timer;
                         }
                         break;
                 }

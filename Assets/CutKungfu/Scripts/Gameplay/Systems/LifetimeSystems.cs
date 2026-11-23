@@ -1,3 +1,4 @@
+using CutKungfu.Core;
 using Unity.Burst;
 using Unity.Collections;
 using Unity.Entities;
@@ -31,9 +32,7 @@ namespace CutKungfu.Gameplay
                 float a = math.saturate(d.Timer / FallTime) * math.PI * 0.5f;
                 quaternion upright = quaternion.LookRotationSafe(f.ValueRO.Facing, math.up());
                 lt.ValueRW.Rotation = math.mul(quaternion.AxisAngle(d.FallAxis, a), upright);
-                ref var v = ref kb.ValueRW.Velocity;
-                lt.ValueRW.Position += v * clock.DeltaTime;
-                v *= math.exp(-5f * clock.DeltaTime);
+                lt.ValueRW.Position += Kinematics.DampedStep(ref kb.ValueRW.Velocity, 5f, clock.DeltaTime);
                 if (d.Timer >= RemoveAfter) ecb.DestroyEntity(e);
             }
             ecb.Playback(state.EntityManager);

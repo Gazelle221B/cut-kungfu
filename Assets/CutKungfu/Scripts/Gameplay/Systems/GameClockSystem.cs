@@ -28,7 +28,9 @@ namespace CutKungfu.Gameplay
             var tuning = SystemAPI.GetSingleton<TuningSingleton>().Value;
             var session = SystemAPI.GetSingleton<SessionState>();
             ref var hitStop = ref SystemAPI.GetSingletonRW<HitStop>().ValueRW;
-            hitStop.Remaining = math.max(0f, hitStop.Remaining - realDt);
+            // ヒットストップがこの更新の途中で明けたら、明けた後の分だけゲーム時間を進める
+            float stopped = math.min(hitStop.Remaining, realDt);
+            hitStop.Remaining -= stopped;
 
             float scale = 1f;
             foreach (var cut in SystemAPI.Query<RefRO<CutState>>().WithAll<PlayerTag>())
@@ -38,12 +40,11 @@ namespace CutKungfu.Gameplay
 
             if (session.Phase == SessionPhase.NG) scale = 0f;
             else if (session.Phase == SessionPhase.Cleared) scale = 0.35f;
-            if (hitStop.Remaining > 0f) scale = 0f;
 
             ref var clock = ref SystemAPI.GetSingletonRW<GameClock>().ValueRW;
-            clock.Scale = scale;
             clock.RealDeltaTime = realDt;
-            clock.DeltaTime = realDt * scale;
+            clock.DeltaTime = (realDt - stopped) * scale;
+            clock.Scale = realDt > 0f ? clock.DeltaTime / realDt : scale;
             clock.ElapsedReal += realDt;
             clock.ElapsedGame += clock.DeltaTime;
         }

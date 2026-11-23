@@ -56,8 +56,13 @@ namespace CutKungfu.Tests
         /// <summary>ボタンを何も押していない入力(SelectBrick=0 は「掌底を選ぶ」なので -1 にする)。</summary>
         public static PlayerInput Neutral() => new PlayerInput { SelectBrick = -1 };
 
-        public void Step(PlayerInput input, float dt = 1f / 60f)
+        /// <summary>1回の Step で進める実時間[秒]。フレームレートを変えた比較に使う。</summary>
+        public float StepDt = 1f / 60f;
+
+        /// <param name="dt">負なら <see cref="StepDt"/>(0 は「時間を進めない更新」)。</param>
+        public void Step(PlayerInput input, float dt = -1f)
         {
+            if (dt < 0f) dt = StepDt;
             World.SetTime(new TimeData(World.Time.ElapsedTime + dt, dt));
             var q = Em.CreateEntityQuery(typeof(PlayerInput));
             if (q.CalculateEntityCount() > 0) q.SetSingleton(input);
@@ -110,6 +115,13 @@ namespace CutKungfu.Tests
         /// </summary>
         public void PerformCut(params (BrickKind kind, float3 position)[] poses)
         {
+            PlacePoses(poses);
+            ReleaseCut();
+        }
+
+        /// <summary>スローに入り、指定のブリックを指定の位置へ順に置く(解除はしない)。</summary>
+        public void PlacePoses(params (BrickKind kind, float3 position)[] poses)
+        {
             var enter = Neutral();
             enter.Cut = true;
             Step(enter);
@@ -122,6 +134,11 @@ namespace CutKungfu.Tests
                 place.Primary = true;
                 Step(place);
             }
+        }
+
+        /// <summary>スローを解除して、置いたポーズを実行させる。</summary>
+        public void ReleaseCut()
+        {
             var release = Neutral();
             release.Cut = true;
             Step(release);

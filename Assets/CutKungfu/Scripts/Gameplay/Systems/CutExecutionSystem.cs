@@ -93,6 +93,8 @@ namespace CutKungfu.Gameplay
 
             if (!sample.Finished) return;
 
+            // 区間を越えた分の時間は次の区間(または硬直)に持ち越す。捨てると、1回の更新が長いほど技が遅れる
+            float overshoot = math.max(0f, cut.SegmentTime - cut.SegmentDuration);
             cut.SegmentIndex++;
             cut.StrikeFired = false;
             if (cut.SegmentIndex < cut.PoseCount)
@@ -100,7 +102,7 @@ namespace CutKungfu.Gameplay
                 var next = poses[cut.SegmentIndex];
                 cut.SegmentFrom = pose.Position;
                 cut.SegmentFromYaw = pose.Yaw;
-                cut.SegmentTime = 0f;
+                cut.SegmentTime = overshoot;
                 cut.SegmentDuration = CutRules.SegmentDuration(tuning, math.distance(pose.Position.xz, next.Position.xz));
             }
             else
@@ -108,7 +110,7 @@ namespace CutKungfu.Gameplay
                 cut.Phase = CutPhase.Commit;
                 // 硬直 0 秒(条件 B)でも記録の確定は次の更新で行う(最後の1打の撃破数・映え点を DamageSystem が書き込むため)。
                 // その1フレームを硬直扱いしないのは DamageSystem 側の責任(CommitDuration > 0 のときだけ硬直とみなす)
-                cut.CommitRemaining = cut.CommitDuration;
+                cut.CommitRemaining = cut.CommitDuration - overshoot;
             }
         }
 

@@ -4,7 +4,7 @@ using Unity.Mathematics;
 
 namespace CutKungfu.Gameplay
 {
-    /// <summary>被弾硬直・無敵・フラッシュの残り時間を減らす。</summary>
+    /// <summary>被弾硬直・無敵・フラッシュの残り時間を減らす。硬直が明けた後の時間を FreeTime に書く。</summary>
     [UpdateInGroup(typeof(GameplaySystemGroup))]
     [UpdateAfter(typeof(GameClockSystem))]
     public partial struct FighterTimersSystem : ISystem
@@ -20,7 +20,9 @@ namespace CutKungfu.Gameplay
             foreach (var fighter in SystemAPI.Query<RefRW<Fighter>>())
             {
                 ref var f = ref fighter.ValueRW;
-                f.HitStun = math.max(0f, f.HitStun - dt);
+                float stunned = math.min(f.HitStun, dt);
+                f.HitStun = math.max(0f, f.HitStun - stunned);
+                f.FreeTime = dt - stunned;
                 f.Invulnerable = math.max(0f, f.Invulnerable - dt);
                 f.Flash = math.max(0f, f.Flash - clock.RealDeltaTime);
             }
