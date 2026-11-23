@@ -231,8 +231,10 @@ namespace CutKungfu.Core
             EnemyKnockback = 5f,
             EnemyHitStun = 0.3f,
             EnemyCutHitStun = 0.8f,
-            EnemyAreaHitStun = 0.8f,
-            EnemyWaitScaleAfterCutHit = 1f,
+            // 範囲技で当てた敵の被弾硬直を短くし、硬直明けの待ちを半分にする(候補A): 包囲の4個技の硬直に罰が届くように。
+            // 0.8 / 待ち1 では4個技の被弾率 32%、0.3 / 0.5 で 60%(1〜3個技は変わらない。CommitPunishmentTests)
+            EnemyAreaHitStun = 0.3f,
+            EnemyWaitScaleAfterCutHit = 0.5f,
             EnemyStaggerOnParry = 1.2f,
             EnemyMaxConcurrentWindups = 2,
 
