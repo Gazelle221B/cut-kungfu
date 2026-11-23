@@ -161,5 +161,35 @@ namespace CutKungfu.Tests
             float focus2 = CutRules.StrikeDamage(t, BrickKind.Palm, 2) + CutRules.StrikeDamage(t, BrickKind.FlyingKick, 2);
             Assert.That(focus2, Is.LessThan(t.EnemyMaxHealth), "2ポーズでは倒しきれない");
         }
+        [Test]
+        public void AreaDamageCap_LimitsTheTotalAnAreaBrickDealsToOneEnemyPerCut()
+        {
+            var t = T;
+            float cap = t.AreaDamageCapRatio * 90f; // 72
+            Assert.That(CutRules.CapAreaDamage(t, 90f, alreadyTaken: 0f, damage: 56f, out bool c1), Is.EqualTo(56f).Within(1e-4f));
+            Assert.That(c1, Is.False);
+            Assert.That(CutRules.CapAreaDamage(t, 90f, alreadyTaken: 56f, damage: 63f, out bool c2), Is.EqualTo(cap - 56f).Within(1e-4f));
+            Assert.That(c2, Is.True);
+            Assert.That(CutRules.CapAreaDamage(t, 90f, alreadyTaken: cap, damage: 20f, out bool c3), Is.EqualTo(0f).Within(1e-4f));
+            Assert.That(c3, Is.True);
+        }
+
+        [Test]
+        public void AreaDamageCap_OfOneOrMore_DisablesTheRule()
+        {
+            var t = T;
+            t.AreaDamageCapRatio = 1f;
+            Assert.That(CutRules.CapAreaDamage(t, 90f, alreadyTaken: 80f, damage: 63f, out bool capped), Is.EqualTo(63f));
+            Assert.That(capped, Is.False);
+        }
+
+        [Test]
+        public void AreaBricks_AreSpinAndTableLanding()
+        {
+            Assert.That(CutRules.IsAreaBrick(BrickKind.Spin), Is.True);
+            Assert.That(CutRules.IsAreaBrick(BrickKind.TableLanding), Is.True);
+            Assert.That(CutRules.IsAreaBrick(BrickKind.Palm), Is.False);
+            Assert.That(CutRules.IsAreaBrick(BrickKind.FlyingKick), Is.False, "飛び蹴りの経路判定は(まだ)含めない");
+        }
     }
 }

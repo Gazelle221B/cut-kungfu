@@ -229,6 +229,10 @@ namespace CutKungfu.Presentation
                     case FeedbackKind.CutHit:
                         SpawnPopup(e.Position, e.Extra > 0 ? $"{e.Value:0}  映え+{e.Extra}" : $"{e.Value:0}", "world-label--popup-cut");
                         break;
+                    case FeedbackKind.CutHitCapped:
+                        // 範囲技の上限に掛かった: 削られたことが分かるよう、色を変えて「上限」と添える
+                        SpawnPopup(e.Position, $"{e.Value:0} 上限", "world-label--popup-capped");
+                        break;
                     case FeedbackKind.Parry:
                         SpawnPopup(e.Position, "捌き!", "world-label--popup-parry");
                         break;

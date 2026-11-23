@@ -268,3 +268,6 @@
 
 /* 同じブリックの繰り返しで威力が下がることを、置く前に見せる */
 .brick__repeat { font-size: 12px; color: var(--danger); -unity-font-style: bold; }
+
+/* 範囲技の上限に掛かった打撃: 削られたことを灰色で見せる */
+.world-label--popup-capped { color: #B8B0A4; font-size: 22px; }

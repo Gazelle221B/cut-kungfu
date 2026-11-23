@@ -52,6 +52,8 @@ namespace CutKungfu.Gameplay
         NG,
         Clear,
         TakeStart,
+        /// <summary>カット技の1打が、範囲技の上限に掛かって削られた。Value=実際のダメージ。</summary>
+        CutHitCapped,
     }
 
     /// <summary>
@@ -70,6 +72,15 @@ namespace CutKungfu.Gameplay
     public struct TelemetryEvent : IBufferElementData
     {
         public PlaytestEvent Value;
+    }
+
+    /// <summary>
+    /// 1回の技の中で、範囲技が各敵に与えたダメージの台帳(上限の計算用)。シングルトンに付き、解除のたびに空にする。
+    /// </summary>
+    public struct CutAreaDamage : IBufferElementData
+    {
+        public Entity Enemy;
+        public float Taken;
     }
 
     /// <summary>判定の見える化用の一瞬のエフェクト。</summary>

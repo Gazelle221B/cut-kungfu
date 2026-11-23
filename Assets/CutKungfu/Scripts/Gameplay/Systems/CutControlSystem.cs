@@ -246,6 +246,8 @@ namespace CutKungfu.Gameplay
             }
 
             cut.PoseCount = poses.Length;
+            // 範囲技の上限は技ごと: 新しい技の始まりで台帳を空にする
+            SystemAPI.GetSingletonBuffer<CutAreaDamage>().Clear();
             cut.SegmentIndex = 0;
             cut.SegmentTime = 0f;
             cut.SegmentFrom = playerPos;

@@ -28,6 +28,7 @@
         "CutSegmentMin": 0.14,
         "CutSegmentMax": 0.38,
         "RepeatBrickScale": 0.5,
+        "AreaDamageCapRatio": 0.8,
         "StrikeAssist": 1.2,
         "InvulnerableDuringSlow": true,
         "InvulnerableDuringExecution": false,
