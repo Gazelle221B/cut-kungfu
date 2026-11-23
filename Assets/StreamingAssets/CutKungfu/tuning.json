@@ -8,12 +8,13 @@
         "CostPerPose": 10.0,
         "GaugeOnHit": 5.0,
         "GaugeOnParry": 20.0,
+        "GaugeAtWaveStart": 50.0,
         "CommitFixed": 0.3,
         "CommitByPoseCount": {
             "x": 0.2,
-            "y": 0.4,
-            "z": 0.7,
-            "w": 1.1
+            "y": 0.5,
+            "z": 0.9,
+            "w": 1.5
         },
         "CommitScale": 1.0,
         "PowerByPoseCount": {
@@ -28,7 +29,8 @@
         "CutSegmentMax": 0.38,
         "StrikeAssist": 1.2,
         "InvulnerableDuringSlow": true,
-        "InvulnerableDuringExecution": true,
+        "InvulnerableDuringExecution": false,
+        "CounterHitMultiplier": 1.5,
         "Palm": {
             "Reach": 4.5,
             "StrikeRadius": 1.1,
@@ -52,7 +54,7 @@
             "RequiresTable": false
         },
         "FlyingKick": {
-            "Reach": 7.0,
+            "Reach": 5.5,
             "StrikeRadius": 0.9,
             "StrikeForward": 0.5,
             "DamageScale": 1.0,
@@ -64,7 +66,7 @@
         },
         "TableLanding": {
             "Reach": 6.0,
-            "StrikeRadius": 2.4,
+            "StrikeRadius": 2.0,
             "StrikeForward": 0.0,
             "DamageScale": 0.9,
             "Knockback": 9.0,
@@ -90,7 +92,7 @@
         "PlayerHitStun": 0.4,
         "PlayerPostHitInvulnerable": 0.6,
         "EnemyMaxHealth": 90.0,
-        "EnemySpeed": 2.4,
+        "EnemySpeed": 3.2,
         "EnemyRadius": 0.42,
         "EnemyEngageRange": 1.35,
         "EnemyWindup": 0.9,
@@ -99,7 +101,7 @@
         "EnemyCooldownMax": 2.4,
         "EnemyStrikeRadius": 0.85,
         "EnemyStrikeForward": 0.9,
-        "EnemyDamage": 12.0,
+        "EnemyDamage": 16.0,
         "EnemyKnockback": 5.0,
         "EnemyHitStun": 0.3,
         "EnemyCutHitStun": 0.8,

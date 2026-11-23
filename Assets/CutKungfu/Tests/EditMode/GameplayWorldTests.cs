@@ -116,7 +116,7 @@ namespace CutKungfu.Tests
             Step();
             Assert.That(Singleton<SessionState>().Phase, Is.EqualTo(SessionPhase.Playing));
             Assert.That(_em.CreateEntityQuery(typeof(EnemyTag)).CalculateEntityCount(), Is.EqualTo(1));
-            Assert.That(_em.GetComponentData<FilmGauge>(_player).Value, Is.EqualTo(Tuning.Default.GaugeMax));
+            Assert.That(_em.GetComponentData<FilmGauge>(_player).Value, Is.EqualTo(Tuning.Default.GaugeAtWaveStart));
         }
 
         [Test]
@@ -125,14 +125,15 @@ namespace CutKungfu.Tests
             Step();
             Step(new PlayerInput { Cut = true });
             Assert.That(_em.GetComponentData<CutState>(_player).Phase, Is.EqualTo(CutPhase.Slow));
-            Assert.That(_em.GetComponentData<FilmGauge>(_player).Value, Is.EqualTo(80f).Within(1e-4f));
+            float start = Tuning.Default.GaugeAtWaveStart;
+            Assert.That(_em.GetComponentData<FilmGauge>(_player).Value, Is.EqualTo(start - 20f).Within(1e-4f));
 
             // 正面の地面へ2つ置く
             var aim = new PlayerInput { AimStick = new float2(0.5f, 0f), Primary = true };
             Step(aim);
             Step(aim);
             Assert.That(_em.GetBuffer<PlacedPose>(_player).Length, Is.EqualTo(2));
-            Assert.That(_em.GetComponentData<FilmGauge>(_player).Value, Is.EqualTo(60f).Within(1e-4f));
+            Assert.That(_em.GetComponentData<FilmGauge>(_player).Value, Is.EqualTo(start - 40f).Within(1e-4f));
             Assert.That(_em.CreateEntityQuery(typeof(GhostPose)).CalculateEntityCount(), Is.EqualTo(3), "置いた2つ+照準プレビュー1つ");
 
             Step(new PlayerInput { Cut = true });
@@ -149,7 +150,7 @@ namespace CutKungfu.Tests
             Step(new PlayerInput { AimStick = new float2(0.5f, 0f), Primary = true });
             Step(new PlayerInput { Secondary = true });
             Assert.That(_em.GetBuffer<PlacedPose>(_player).Length, Is.Zero);
-            Assert.That(_em.GetComponentData<FilmGauge>(_player).Value, Is.EqualTo(80f).Within(1e-4f));
+            Assert.That(_em.GetComponentData<FilmGauge>(_player).Value, Is.EqualTo(Tuning.Default.GaugeAtWaveStart - 20f).Within(1e-4f));
         }
 
         [Test]
@@ -173,7 +174,7 @@ namespace CutKungfu.Tests
         }
 
         [Test]
-        public void HitDuringCommit_IsRecorded_AndEndsCommit()
+        public void HitDuringCommit_IsCounterHit_AndDoesNotShortenCommit()
         {
             Step();
             var enemy = FirstEnemy();
@@ -185,10 +186,40 @@ namespace CutKungfu.Tests
             Step(dt: 0f);
 
             var cut = _em.GetComponentData<CutState>(_player);
-            Assert.That(_em.GetComponentData<Fighter>(_player).Health, Is.EqualTo(88f));
+            Assert.That(_em.GetComponentData<Fighter>(_player).Health, Is.EqualTo(100f - 12f * Tuning.Default.CounterHitMultiplier).Within(1e-4f));
             Assert.That(cut.Record.HitDuringCommit, Is.True);
-            Assert.That(cut.CommitRemaining, Is.Zero);
+            Assert.That(cut.CommitRemaining, Is.EqualTo(1.2f).Within(1e-5f), "殴られても硬直は短くならない");
         }
+
+        [Test]
+        public void ZeroLengthCommit_IsNotTreatedAsCommitted()
+        {
+            Step();
+            var enemy = FirstEnemy();
+            _em.SetComponentData(_player, new CutState { Phase = CutPhase.Commit, PoseCount = 4, CommitDuration = 0f, CommitRemaining = 0f });
+            QueueEnemyStrike(enemy);
+            Step(dt: 0f);
+            Assert.That(_em.GetComponentData<Fighter>(_player).Health, Is.EqualTo(88f), "カウンターにならない");
+        }
+
+        [Test]
+        public void StrikeFromAttackerKnockedOutThisFrame_DoesNotLand()
+        {
+            Step();
+            var enemy = FirstEnemy();
+            var ef = _em.GetComponentData<Fighter>(enemy);
+            ef.HitStun = 0.3f;
+            _em.SetComponentData(enemy, ef);
+            QueueEnemyStrike(enemy);
+            Step(dt: 0f);
+            Assert.That(_em.GetComponentData<Fighter>(_player).Health, Is.EqualTo(100f));
+        }
+
+        void QueueEnemyStrike(Entity enemy)
+            => _em.GetBuffer<DamageRequest>(_em.CreateEntityQuery(typeof(DamageRequest)).GetSingletonEntity()).Add(new DamageRequest
+            {
+                Attacker = enemy, AttackerTeam = Team.Enemy, Kind = StrikeKind.EnemyStrike, Radius = 1f, Damage = 12f, HitStun = 0.4f,
+            });
 
         [Test]
         public void PlayerDeath_GoesToNg_ThenRetakesSameWave()

@@ -17,6 +17,8 @@ namespace CutKungfu.Presentation
             public float Eta;
             public bool Windup;
             public bool Staggered;
+            /// <summary>今解除したら、技の実行中か硬直中に殴ってくる見込み。</summary>
+            public bool Threat;
         }
 
         public struct GhostMarker
@@ -53,6 +55,10 @@ namespace CutKungfu.Presentation
         public float PowerIfReleased;
         public float CommitRemaining;
         public float CommitDuration;
+        /// <summary>硬直が起きる位置(スロー中は最後に置いたポーズ、それ以外は主人公)。</summary>
+        public Vector3 CommitPosition;
+        /// <summary>今解除した場合に無防備になる時間の終わり(実行時間+硬直, ゲーム秒)。</summary>
+        public float VulnerableUntil;
         public float MinGaugeToEnter;
         public float CostPerPose;
 

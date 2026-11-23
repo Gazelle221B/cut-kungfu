@@ -36,13 +36,22 @@ namespace CutKungfu.Gameplay
         public float SegmentTime;
         public float SegmentDuration;
         public float3 SegmentFrom;
+        public float SegmentFromYaw;
+        /// <summary>今の区間の打撃を出したか(接触フレームで一度だけ出す)。</summary>
+        public bool StrikeFired;
         public float CommitDuration;
         public float CommitRemaining;
 
         /// <summary>このカットの記録(解除〜硬直明けで確定してテレメトリへ流す)。</summary>
         public PlaytestEvent Record;
 
+        /// <summary>このフレームの入力をカット操作が使った(同じ押下で捌き等を出さない)。</summary>
+        public bool InputConsumed;
+
         public readonly bool IsActive => Phase != CutPhase.None;
+
+        /// <summary>殴られたら硬直の罰を受ける状態か。硬直 0 秒(条件 B)の確定待ち1フレームは含めない。</summary>
+        public readonly bool IsCommitted => Phase == CutPhase.Commit && CommitDuration > 0f;
     }
 
     /// <summary>置いたポーズ(最大4)。置いた順に並ぶ。</summary>

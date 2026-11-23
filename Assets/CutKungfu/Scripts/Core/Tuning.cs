@@ -43,6 +43,8 @@ namespace CutKungfu.Core
         public float CostPerPose;
         public float GaugeOnHit;
         public float GaugeOnParry;
+        /// <summary>ウェーブ開始時のゲージ。満タン未満にして「今止めるか、溜めて待つか」(GDD 6章 第3の判断)を作る。</summary>
+        public float GaugeAtWaveStart;
         /// <summary>解除後コミット時間の固定分[s]。</summary>
         public float CommitFixed;
         /// <summary>ポーズ数 1..4 ごとの追加コミット時間[s](x=1個 … w=4個)。</summary>
@@ -59,6 +61,8 @@ namespace CutKungfu.Core
         public float StrikeAssist;
         public bool InvulnerableDuringSlow;
         public bool InvulnerableDuringExecution;
+        /// <summary>硬直中に受けた攻撃の倍率(カウンターヒット)。硬直の罰を体力でも見せる。</summary>
+        public float CounterHitMultiplier;
 
         public BrickTuning Palm;
         public BrickTuning Spin;
@@ -131,8 +135,11 @@ namespace CutKungfu.Core
             CostPerPose = 10f,
             GaugeOnHit = 5f,
             GaugeOnParry = 20f,
+            GaugeAtWaveStart = 50f,
             CommitFixed = 0.3f,
-            CommitByPoseCount = new float4(0.2f, 0.4f, 0.7f, 1.1f),
+            // GDD 6章の仮値(0.2/0.4/0.7/1.1)では、最後のポーズで空き地へ逃げれば硬直を踏み倒せた(設計レビュー)。
+            // 3〜4個の隙を、敵が詰めてくる時間より長くする。
+            CommitByPoseCount = new float4(0.2f, 0.5f, 0.9f, 1.5f),
             CommitScale = 1f,
             PowerByPoseCount = new float4(1.0f, 1.6f, 2.4f, 3.5f),
             CutBaseDamage = 20f,
@@ -141,7 +148,9 @@ namespace CutKungfu.Core
             CutSegmentMax = 0.38f,
             StrikeAssist = 1.2f,
             InvulnerableDuringSlow = true,
-            InvulnerableDuringExecution = true,
+            // 実行中も殴られる(TDD 7章「中断」)。スロー中に敵の予備動作を読む意味を残す
+            InvulnerableDuringExecution = false,
+            CounterHitMultiplier = 1.5f,
 
             Palm = new BrickTuning
             {
@@ -155,12 +164,12 @@ namespace CutKungfu.Core
             },
             FlyingKick = new BrickTuning
             {
-                Reach = 7f, StrikeRadius = 0.9f, StrikeForward = 0.5f, DamageScale = 1f,
+                Reach = 5.5f, StrikeRadius = 0.9f, StrikeForward = 0.5f, DamageScale = 1f,
                 Knockback = 13f, HaeScale = 1.2f, ArcHeight = 1.4f, SweepPath = true,
             },
             TableLanding = new BrickTuning
             {
-                Reach = 6f, StrikeRadius = 2.4f, StrikeForward = 0f, DamageScale = 0.9f,
+                Reach = 6f, StrikeRadius = 2.0f, StrikeForward = 0f, DamageScale = 0.9f,
                 Knockback = 9f, HaeScale = 1.6f, ArcHeight = 1.2f, RequiresTable = true,
             },
 
@@ -184,7 +193,7 @@ namespace CutKungfu.Core
             // 散らして1体1ポーズでは倒しきれず(4個でも84)、1体に集中すれば3ポーズで倒せる(173)。
             // 「全員を一度に片付けて硬直を踏み倒す」解を消し、置く数の判断を残すための値。
             EnemyMaxHealth = 90f,
-            EnemySpeed = 2.4f,
+            EnemySpeed = 3.2f,
             EnemyRadius = 0.42f,
             EnemyEngageRange = 1.35f,
             EnemyWindup = 0.9f,
@@ -193,7 +202,7 @@ namespace CutKungfu.Core
             EnemyCooldownMax = 2.4f,
             EnemyStrikeRadius = 0.85f,
             EnemyStrikeForward = 0.9f,
-            EnemyDamage = 12f,
+            EnemyDamage = 16f,
             EnemyKnockback = 5f,
             EnemyHitStun = 0.3f,
             EnemyCutHitStun = 0.8f,

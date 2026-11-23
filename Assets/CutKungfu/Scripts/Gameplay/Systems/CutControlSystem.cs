@@ -51,6 +51,7 @@ namespace CutKungfu.Gameplay
             var fighter = SystemAPI.GetComponent<Fighter>(player);
             var action = SystemAPI.GetComponent<PlayerAction>(player);
             float3 playerPos = SystemAPI.GetComponent<LocalTransform>(player).Position;
+            cut.InputConsumed = false;
 
             if (input.SelectBrick >= 0 && input.SelectBrick < BrickKinds.Count) cut.SelectedKind = (BrickKind)input.SelectBrick;
             if (input.CycleBrick != 0) cut.SelectedKind = (BrickKind)(((int)cut.SelectedKind + input.CycleBrick + BrickKinds.Count) % BrickKinds.Count);
@@ -63,6 +64,7 @@ namespace CutKungfu.Gameplay
                     if (CutRules.CanEnterSlow(tuning, gauge.Value))
                     {
                         EnterSlow(ref state, ref cut, ref gauge, session, clock, tuning, playerPos);
+                        cut.InputConsumed = true;
                         SystemAPI.SetComponent(player, new PlayerAction());
                         SystemAPI.SetComponent(player, new Knockback());
                     }
@@ -74,11 +76,12 @@ namespace CutKungfu.Gameplay
             }
             else if (cut.Phase == CutPhase.Slow)
             {
+                cut.InputConsumed = true; // スロー中の押下は「置く・戻す」であって攻撃・捌きではない
                 cut.SlowRealElapsed += clock.RealDeltaTime;
                 UpdateSlow(ref state, player, ref cut, ref gauge, input, tuning, table, fighter.Facing, playerPos);
 
                 bool timeUp = cut.SlowRealElapsed >= tuning.SlowMaxRealSeconds;
-                if (input.Cut || timeUp) Release(ref state, player, ref cut, session, tuning, playerPos);
+                if (input.Cut || timeUp) Release(ref state, player, ref cut, session, tuning, playerPos, fighter.Facing, timeUp);
             }
 
             SystemAPI.SetComponent(player, cut);
@@ -90,8 +93,13 @@ namespace CutKungfu.Gameplay
         {
             var waves = SystemAPI.GetSingletonBuffer<ScenarioWave>(true);
             int near = 0;
-            foreach (var lt in SystemAPI.Query<RefRO<LocalTransform>>().WithAll<EnemyTag>().WithNone<Dying>())
-                if (math.distance(lt.ValueRO.Position.xz, playerPos.xz) <= NearRadius) near++;
+            float minEta = float.MaxValue;
+            foreach (var (lt, brain) in SystemAPI.Query<RefRO<LocalTransform>, RefRO<EnemyBrain>>().WithAll<EnemyTag>().WithNone<Dying>())
+            {
+                float dist = math.distance(lt.ValueRO.Position.xz, playerPos.xz);
+                if (dist <= NearRadius) near++;
+                minEta = math.min(minEta, brain.ValueRO.NextAttackEta(tuning, dist));
+            }
 
             cut.Record = new PlaytestEvent
             {
@@ -104,6 +112,7 @@ namespace CutKungfu.Gameplay
                 EnemiesAlive = _aliveEnemies.CalculateEntityCount(),
                 EnemiesNear = near,
                 GaugeBefore = gauge.Value,
+                MinEnemyEta = minEta == float.MaxValue ? 0f : minEta,
             };
             gauge.Add(-tuning.SlowFixedCost);
             cut.Phase = CutPhase.Slow;
@@ -120,6 +129,13 @@ namespace CutKungfu.Gameplay
             float3 anchor = placed > 0 ? poses[placed - 1].Position : playerPos;
             var brick = tuning.GetBrick(cut.SelectedKind);
             float3 aim = Aim(input, table, anchor, facing, brick.Reach);
+            // 壁の外には置けない(凸な部屋なので、照準を部屋に収めれば到達距離で丸めても外に出ない)
+            if (SystemAPI.TryGetSingleton<ArenaBounds>(out var arena))
+            {
+                float r = tuning.PlayerRadius;
+                aim.x = math.clamp(aim.x, arena.Min.x + r, arena.Max.x - r);
+                aim.z = math.clamp(aim.z, arena.Min.y + r, arena.Max.y - r);
+            }
 
             var result = CutRules.ValidatePlacement(tuning, cut.SelectedKind, placed, gauge.Value, anchor, aim, table, out float3 pos);
             float2 dir = pos.xz - anchor.xz;
@@ -141,6 +157,7 @@ namespace CutKungfu.Gameplay
                 }
                 else
                 {
+                    cut.Record.Rejects++;
                     Feedback(ref state, FeedbackKind.PoseRejected, pos, (int)result);
                 }
             }
@@ -151,6 +168,7 @@ namespace CutKungfu.Gameplay
                 if (state.EntityManager.Exists(last.Ghost)) state.EntityManager.DestroyEntity(last.Ghost);
                 gauge.Add(tuning.CostPerPose);
                 cut.Record.Sequence = BrickSequence.RemoveLast(cut.Record.Sequence);
+                cut.Record.Undos++;
                 Feedback(ref state, FeedbackKind.PoseUndone, last.Position, placed - 1);
                 placed--;
             }
@@ -202,8 +220,11 @@ namespace CutKungfu.Gameplay
             }
         }
 
-        void Release(ref SystemState state, Entity player, ref CutState cut, in SessionState session, in Tuning tuning, float3 playerPos)
+        void Release(ref SystemState state, Entity player, ref CutState cut, in SessionState session, in Tuning tuning, float3 playerPos,
+            float3 facing, bool timedOut)
         {
+            cut.Record.SlowSeconds = cut.SlowRealElapsed;
+            cut.Record.TimedOut = timedOut;
             var em = state.EntityManager;
             if (cut.Preview != Entity.Null && em.Exists(cut.Preview)) em.DestroyEntity(cut.Preview);
             cut.Preview = Entity.Null;
@@ -223,6 +244,8 @@ namespace CutKungfu.Gameplay
             cut.SegmentIndex = 0;
             cut.SegmentTime = 0f;
             cut.SegmentFrom = playerPos;
+            cut.SegmentFromYaw = CutMotion.YawOf(facing);
+            cut.StrikeFired = false;
             cut.SegmentDuration = CutRules.SegmentDuration(tuning, math.distance(playerPos.xz, poses[0].Position.xz));
             cut.CommitDuration = CutRules.CommitTime(tuning, cut.PoseCount, session.CommitEnabled);
             cut.Record.Poses = cut.PoseCount;

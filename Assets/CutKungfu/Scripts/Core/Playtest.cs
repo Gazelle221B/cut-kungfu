@@ -42,13 +42,28 @@ namespace CutKungfu.Core
         public bool HitDuringCommit;
         public float Hae;
         public float PlayerHealth;
+
+        // --- 対立仮説「置く操作が面倒なだけ」を切り分けるための操作の記録 ---
+        /// <summary>スローに居た実時間[s]。</summary>
+        public float SlowSeconds;
+        /// <summary>スローの制限時間切れで解除されたか。</summary>
+        public bool TimedOut;
+        /// <summary>置いたポーズを戻した回数。</summary>
+        public int Undos;
+        /// <summary>置こうとして置けなかった回数(机以外に机の技、ゲージ不足など)。</summary>
+        public int Rejects;
+        /// <summary>スロー突入時に最も早く殴ってくる敵までの時間(ゲーム秒)。包囲の切迫度。</summary>
+        public float MinEnemyEta;
+        /// <summary>技の実行中に殴られて中断したか。</summary>
+        public bool Interrupted;
     }
 
     public static class PlaytestCsv
     {
         public const string Header =
             "kind,time,wave,formation_enemies,take,commit_enabled,enemies_alive,enemies_near,poses,sequence," +
-            "gauge_before,commit_time,kills,hit_during_commit,hae,player_hp";
+            "gauge_before,commit_time,kills,hit_during_commit,hae,player_hp," +
+            "slow_seconds,timed_out,undos,rejects,min_enemy_eta,interrupted";
 
         public static string KindCode(PlaytestEventKind k) => k switch
         {
@@ -81,7 +96,13 @@ namespace CutKungfu.Core
               .Append(e.Kills).Append(',')
               .Append(e.HitDuringCommit ? 1 : 0).Append(',')
               .Append(e.Hae.ToString("F1", c)).Append(',')
-              .Append(e.PlayerHealth.ToString("F1", c));
+              .Append(e.PlayerHealth.ToString("F1", c)).Append(',')
+              .Append(e.SlowSeconds.ToString("F2", c)).Append(',')
+              .Append(e.TimedOut ? 1 : 0).Append(',')
+              .Append(e.Undos).Append(',')
+              .Append(e.Rejects).Append(',')
+              .Append(e.MinEnemyEta.ToString("F2", c)).Append(',')
+              .Append(e.Interrupted ? 1 : 0);
             return sb.ToString();
         }
     }

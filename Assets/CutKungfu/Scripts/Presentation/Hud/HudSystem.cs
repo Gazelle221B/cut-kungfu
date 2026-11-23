@@ -1,6 +1,7 @@
 using CutKungfu.Core;
 using CutKungfu.Gameplay;
 using Unity.Entities;
+using Unity.Mathematics;
 using Unity.Transforms;
 
 namespace CutKungfu.Presentation
@@ -84,15 +85,29 @@ namespace CutKungfu.Presentation
             s.CommitRemaining = cut.CommitRemaining;
             s.CommitDuration = cut.CommitDuration;
 
+            // 今解除したら: 置いた順に辿る時間 + 硬直。その間に殴ってくる敵を「危険」として示す
+            var poses = SystemAPI.GetBuffer<PlacedPose>(player);
+            float exec = 0f;
+            float3 from = s.PlayerPosition;
+            for (int i = 0; i < poses.Length; i++)
+            {
+                exec += CutRules.SegmentDuration(tuning, math.distance(from.xz, poses[i].Position.xz));
+                from = poses[i].Position;
+            }
+            s.CommitPosition = from;
+            s.VulnerableUntil = cut.Phase == CutPhase.Slow && placed > 0 ? exec + s.CommitIfReleased : 0f;
+
             foreach (var (brain, lt) in SystemAPI.Query<RefRO<EnemyBrain>, RefRO<LocalTransform>>().WithAll<EnemyTag>().WithNone<Dying>())
             {
-                s.Enemies.Add(new HudSnapshot.EnemyMarker
+                var marker = new HudSnapshot.EnemyMarker
                 {
                     Position = lt.ValueRO.Position,
-                    Eta = brain.ValueRO.NextAttackEta(tuning.EnemyWindup),
+                    Eta = brain.ValueRO.NextAttackEta(tuning, math.distance(lt.ValueRO.Position.xz, ((float3)s.PlayerPosition).xz)),
                     Windup = brain.ValueRO.State == EnemyState.Windup,
                     Staggered = brain.ValueRO.State == EnemyState.Staggered,
-                });
+                };
+                marker.Threat = s.VulnerableUntil > 0f && marker.Eta < s.VulnerableUntil;
+                s.Enemies.Add(marker);
             }
 
             foreach (var (ghost, lt) in SystemAPI.Query<RefRO<GhostPose>, RefRO<LocalTransform>>())

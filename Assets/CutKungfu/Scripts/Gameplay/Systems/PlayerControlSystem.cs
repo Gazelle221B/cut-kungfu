@@ -29,7 +29,9 @@ namespace CutKungfu.Gameplay
             if (SystemAPI.GetSingleton<SessionState>().Phase != SessionPhase.Playing) return;
 
             var player = SystemAPI.GetSingletonEntity<PlayerTag>();
-            if (SystemAPI.GetComponent<CutState>(player).IsActive) return;
+            var cut = SystemAPI.GetComponent<CutState>(player);
+            // カット中、またはこのフレームの押下をカット操作が使った(戻すと同時に切った等)なら通常行動は出さない
+            if (cut.IsActive || cut.InputConsumed) return;
 
             var input = SystemAPI.GetSingleton<PlayerInput>();
             var tuning = SystemAPI.GetSingleton<TuningSingleton>().Value;

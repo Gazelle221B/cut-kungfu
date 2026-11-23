@@ -157,9 +157,11 @@ namespace CutKungfu.Presentation
             {
                 var label = _enemyLabels.Next();
                 Place(label, panel, cam, e.Position + Vector3.up * 2.3f);
-                label.text = e.Windup ? $"! {e.Eta:0.0}" : e.Staggered ? "よろけ" : $"{e.Eta:0.0}";
+                label.text = e.Windup ? $"! {e.Eta:0.0}" : e.Staggered ? $"よろけ {e.Eta:0.0}" : $"{e.Eta:0.0}";
                 label.EnableInClassList("world-label--windup", e.Windup);
                 label.EnableInClassList("world-label--soon", !e.Windup && e.Eta < 1.2f);
+                // スロー中: 今解除したら技の途中か硬直中に殴ってくる敵
+                label.EnableInClassList("world-label--threat", e.Threat);
             }
             _enemyLabels.End();
 
@@ -195,7 +197,9 @@ namespace CutKungfu.Presentation
                 _filmFrames[i].EnableInClassList("film-strip__frame--spent", i >= alive);
             }
             _filmLabel.text = $"硬直 {remaining:0.0}s";
-            var p = RuntimePanelUtils.CameraTransformWorldToPanel(panel, s.PlayerPosition + Vector3.down * 0.15f, cam);
+            // 硬直は最後のポーズの位置で起きるので、帯もそこに出す
+            var at = slow ? s.CommitPosition : s.PlayerPosition;
+            var p = RuntimePanelUtils.CameraTransformWorldToPanel(panel, at + Vector3.down * 0.15f, cam);
             _filmStrip.style.left = p.x;
             _filmStrip.style.top = p.y;
         }
@@ -223,10 +227,10 @@ namespace CutKungfu.Presentation
                         SpawnPopup(e.Position, RejectText((PlacementResult)e.Extra), "world-label--popup-hurt");
                         break;
                     case FeedbackKind.SlowEnter:
-                        ShowBanner("止める", "", null, sticky: false, life: 0.5f);
+                        ShowBanner("止める", "", null, sticky: false, life: 0.5f, minor: true);
                         break;
                     case FeedbackKind.CutRelease:
-                        ShowBanner("切る!", $"{e.Extra} ポーズ", null, sticky: false, life: 0.5f);
+                        ShowBanner("切る!", $"{e.Extra} ポーズ", null, sticky: false, life: 0.5f, minor: true);
                         break;
                     case FeedbackKind.NG:
                         ShowBanner("NG!", NgText(s), "banner__text--ng", sticky: true);
@@ -268,8 +272,10 @@ namespace CutKungfu.Presentation
             _popups.Add(new Popup { Label = label, World = world });
         }
 
-        void ShowBanner(string text, string sub, string extraClass, bool sticky, float life = BannerLife)
+        /// <param name="minor">短い合図(止める・切る)。画面上寄せの小さい文字にして、殺陣を隠さない。</param>
+        void ShowBanner(string text, string sub, string extraClass, bool sticky, float life = BannerLife, bool minor = false)
         {
+            _banner.EnableInClassList("banner--minor", minor);
             _bannerText.text = text;
             _bannerText.EnableInClassList("banner__text--ng", extraClass == "banner__text--ng");
             _bannerText.EnableInClassList("banner__text--ok", extraClass == "banner__text--ok");

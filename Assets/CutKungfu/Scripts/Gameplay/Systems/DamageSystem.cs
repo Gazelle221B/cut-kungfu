@@ -112,6 +112,13 @@ namespace CutKungfu.Gameplay
 
         void ResolveAgainstPlayer(ref SystemState state, in DamageRequest req, Entity player, in Tuning tuning)
         {
+            // 同じ更新で先に潰された(倒された・怯んだ)攻撃者の攻撃は出ない。「先に潰す」を成立させる
+            if (SystemAPI.HasComponent<Fighter>(req.Attacker))
+            {
+                var attacker = SystemAPI.GetComponent<Fighter>(req.Attacker);
+                if (attacker.Health <= 0f || attacker.HitStun > 0f || SystemAPI.HasComponent<Dying>(req.Attacker)) return;
+            }
+
             var lt = SystemAPI.GetComponent<LocalTransform>(player);
             ref var f = ref SystemAPI.GetComponentRW<Fighter>(player).ValueRW;
             if (f.Health <= 0f) return;
@@ -146,8 +153,10 @@ namespace CutKungfu.Gameplay
                 return;
             }
 
-            bool duringCommit = cut.Phase == CutPhase.Commit;
-            f.Health = math.max(0f, f.Health - req.Damage);
+            bool duringCommit = cut.IsCommitted;
+            // 硬直中はカウンターヒット。硬直の罰を体力でも見せる
+            float damage = req.Damage * (duringCommit ? tuning.CounterHitMultiplier : 1f);
+            f.Health = math.max(0f, f.Health - damage);
             f.HitStun = req.HitStun;
             f.Invulnerable = tuning.PlayerPostHitInvulnerable;
             f.Flash = 0.15f;
@@ -155,19 +164,15 @@ namespace CutKungfu.Gameplay
             hitStop.Request(req.HitStop);
             shake.Add(0.45f);
 
-            if (duringCommit)
-            {
-                cut.Record.HitDuringCommit = true;
-                // 殴られたら硬直は被弾硬直に置き換わる(記録は次のフレームで確定)
-                cut.CommitRemaining = 0f;
-            }
+            // 殴られても硬直は短くならない(被弾で救済しない)。記録だけ残す
+            if (duringCommit) cut.Record.HitDuringCommit = true;
 
             ref var session = ref SystemAPI.GetSingletonRW<SessionState>().ValueRW;
             if (f.Health <= 0f) session.LastNgReason = duringCommit ? NgReason.HitDuringCommit : NgReason.HitWhileFree;
 
             feedback.Add(new FeedbackEvent
             {
-                Kind = FeedbackKind.PlayerHurt, Position = lt.Position, Value = req.Damage, Extra = duringCommit ? 1 : 0,
+                Kind = FeedbackKind.PlayerHurt, Position = lt.Position, Value = damage, Extra = duringCommit ? 1 : 0,
             });
 
             var clock = SystemAPI.GetSingleton<GameClock>();

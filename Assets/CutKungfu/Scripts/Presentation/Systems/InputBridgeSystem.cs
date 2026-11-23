@@ -62,20 +62,26 @@ namespace CutKungfu.Presentation
             SystemAPI.SetSingleton(input);
         }
 
-        /// <summary>ホイールは1ノッチ=120 などデバイス差が大きいので、符号だけを1段ずつ取り出す。</summary>
+        /// <summary>
+        /// ブリックの順送り。ホイールは環境で1ノッチの量が違う(正規化なら ±1、旧来の値なら ±120)ので、
+        /// 1ノッチの大きさを設定から決めて溜め、1ノッチごとに1段だけ進める。
+        /// </summary>
         int ReadCycle()
         {
-            float v = _actions.CycleBrick.ReadValue<float>();
-            if (_actions.CycleBrick.activeControl?.device is Mouse)
+            var mouse = Mouse.current;
+            if (mouse != null)
             {
-                _scrollAccumulator += v;
-                if (math.abs(_scrollAccumulator) < 60f) return 0;
-                int step = _scrollAccumulator > 0 ? -1 : 1;
-                _scrollAccumulator = 0f;
-                return step;
+                float notch = InputSystem.settings.scrollDeltaBehavior == InputSettings.ScrollDeltaBehavior.UniformAcrossAllPlatforms ? 1f : 120f;
+                _scrollAccumulator += mouse.scroll.y.ReadValue();
+                if (math.abs(_scrollAccumulator) >= notch * 0.5f)
+                {
+                    int step = _scrollAccumulator > 0 ? -1 : 1;
+                    _scrollAccumulator = 0f;
+                    return step;
+                }
             }
-            _scrollAccumulator = 0f;
-            return _actions.CycleBrick.WasPressedThisFrame() ? (v > 0 ? 1 : -1) : 0;
+            if (!_actions.CycleBrick.WasPressedThisFrame()) return 0;
+            return _actions.CycleBrick.ReadValue<float>() > 0 ? 1 : -1;
         }
     }
 }

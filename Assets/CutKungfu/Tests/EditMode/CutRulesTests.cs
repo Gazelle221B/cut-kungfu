@@ -17,9 +17,9 @@ namespace CutKungfu.Tests
             => Assert.That(CutRules.PowerMultiplier(T, poses), Is.EqualTo(expected).Within(1e-5f));
 
         [TestCase(1, 0.5f)]
-        [TestCase(2, 0.7f)]
-        [TestCase(3, 1.0f)]
-        [TestCase(4, 1.4f)]
+        [TestCase(2, 0.8f)]
+        [TestCase(3, 1.2f)]
+        [TestCase(4, 1.8f)]
         public void CommitTime_IsFixedPlusPerCount(int poses, float expected)
             => Assert.That(CutRules.CommitTime(T, poses, commitEnabled: true), Is.EqualTo(expected).Within(1e-5f));
 
@@ -34,7 +34,7 @@ namespace CutKungfu.Tests
         {
             var t = T;
             t.CommitScale = 2f;
-            Assert.That(CutRules.CommitTime(t, 4, true), Is.EqualTo(2.8f).Within(1e-5f));
+            Assert.That(CutRules.CommitTime(t, 4, true), Is.EqualTo(3.6f).Within(1e-5f));
         }
 
         [Test]

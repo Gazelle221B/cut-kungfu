@@ -83,7 +83,8 @@ namespace CutKungfu.Gameplay
                         Feedback(ref state, FeedbackKind.NG, SystemAPI.GetComponent<LocalTransform>(player).Position, s.Take);
                         Telemetry(ref state, PlaytestEventKind.NG, s, clock);
                     }
-                    else if (_aliveEnemies.IsEmpty)
+                    // 最後の敵を倒しても、技の途中なら最後まで見せてから「カット!」
+                    else if (_aliveEnemies.IsEmpty && SystemAPI.GetComponent<CutState>(player).Phase != CutPhase.Executing)
                     {
                         s.Phase = SessionPhase.Cleared;
                         s.PhaseTimer = tuning.ClearDelay;
@@ -124,7 +125,17 @@ namespace CutKungfu.Gameplay
             // 途中で終わったカット(NG で切れた多ポーズ技など)も1サンプルとして残す
             var cut = em.GetComponentData<CutState>(player);
             if (cut.Phase == CutPhase.Executing || cut.Phase == CutPhase.Commit)
+            {
                 SystemAPI.GetSingletonBuffer<TelemetryEvent>().Add(new TelemetryEvent { Value = cut.Record });
+            }
+            else if (cut.Phase == CutPhase.Slow)
+            {
+                // スロー中にテイクし直した: 固定費を払ったスロー使用として残す(平均ポーズ数には入れない)
+                var r = cut.Record;
+                r.Kind = PlaytestEventKind.CutCancelled;
+                r.SlowSeconds = cut.SlowRealElapsed;
+                SystemAPI.GetSingletonBuffer<TelemetryEvent>().Add(new TelemetryEvent { Value = r });
+            }
 
             using (var leftovers = _resettable.ToEntityArray(Allocator.Temp))
                 em.DestroyEntity(leftovers);
@@ -144,7 +155,7 @@ namespace CutKungfu.Gameplay
             fighter.Facing = new float3(1, 0, 0);
             fighter.HitStun = fighter.Invulnerable = fighter.Flash = 0f;
             em.SetComponentData(player, fighter);
-            em.SetComponentData(player, new FilmGauge { Value = tuning.GaugeMax, Max = tuning.GaugeMax });
+            em.SetComponentData(player, new FilmGauge { Value = math.min(tuning.GaugeAtWaveStart, tuning.GaugeMax), Max = tuning.GaugeMax });
             em.SetComponentData(player, new PlayerAction());
             em.SetComponentData(player, new Knockback());
             em.SetComponentData(player, new VerticalBody());

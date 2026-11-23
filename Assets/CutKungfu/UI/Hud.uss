@@ -253,3 +253,15 @@
 .stats__cell { width: 78px; font-size: 14px; -unity-text-align: middle-right; }
 .stats__cell--head { width: 110px; -unity-text-align: middle-left; color: var(--mustard); }
 .stats__cell--caption { color: var(--teal); }
+
+/* 今解除したら、技の途中か硬直中に殴ってくる敵(スロー中のみ) */
+.world-label--threat {
+    color: #FFFFFF;
+    background-color: var(--danger);
+    border-width: 2px;
+    border-color: #FFFFFF;
+}
+
+/* 止める・切る の短い合図: 殺陣を隠さないよう上寄せで小さく */
+.banner--minor { top: 9%; }
+.banner--minor .banner__text { font-size: 54px; }

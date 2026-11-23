@@ -44,7 +44,7 @@ namespace CutKungfu.Presentation
             Cut = Button("Cut", "<Keyboard>/space", "<Gamepad>/buttonNorth", "<Gamepad>/leftTrigger");
 
             CycleBrick = _map.AddAction("CycleBrick", InputActionType.Value);
-            CycleBrick.AddBinding("<Mouse>/scroll/y");
+            // ホイールは InputBridgeSystem が直接読む(1ノッチの量が環境で違うため)
             CycleBrick.AddCompositeBinding("1DAxis").With("Negative", "<Gamepad>/dpad/left").With("Positive", "<Gamepad>/dpad/right");
             CycleBrick.AddCompositeBinding("1DAxis").With("Negative", "<Keyboard>/q").With("Positive", "<Keyboard>/e");
 

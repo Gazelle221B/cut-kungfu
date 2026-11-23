@@ -38,7 +38,19 @@ namespace CutKungfu.Presentation
             {
                 var e = events[i].Value;
                 Stats.Add(e);
-                _writer?.WriteLine(PlaytestCsv.ToRow(e));
+                if (_writer == null) continue;
+                try
+                {
+                    _writer.WriteLine(PlaytestCsv.ToRow(e));
+                }
+                catch (Exception ex)
+                {
+                    // 書けなくても集計は続ける。同じ出来事を二重に数えないよう、イベントは必ず消費する
+                    Debug.LogWarning($"[CutKungfu] プレイテスト記録の書き込みに失敗しました。以降は画面の集計のみ: {ex.Message}");
+                    _writer.Dispose();
+                    _writer = null;
+                    _failed = true;
+                }
             }
             events.Clear();
         }

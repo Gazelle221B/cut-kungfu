@@ -86,13 +86,22 @@ namespace CutKungfu.Gameplay
 
         public Unity.Mathematics.Random Random;
 
-        /// <summary>次に殴ってくるまでのおおよその時間(ゲーム時間)。HUD 用。</summary>
-        public readonly float NextAttackEta(float windup) => State switch
+        /// <summary>
+        /// 次に殴ってくるまでの最短の見込み(ゲーム秒)。HUD とテレメトリ用。
+        /// 間合いまで歩く時間と待ち時間は並行して減るので、大きい方に予備動作を足す。
+        /// 戻り・よろけの後の待ち時間は乱数なので最短値で見積もる(楽観しないよう早めに出す)。
+        /// </summary>
+        public readonly float NextAttackEta(in CutKungfu.Core.Tuning t, float distanceToTarget)
         {
-            EnemyState.Windup => Timer,
-            EnemyState.Approach => math.max(0f, Cooldown) + windup,
-            _ => Timer + windup,
-        };
+            float travel = math.max(0f, distanceToTarget - t.EnemyEngageRange) / math.max(0.01f, t.EnemySpeed);
+            return State switch
+            {
+                EnemyState.Windup => math.max(0f, Timer),
+                EnemyState.Approach => math.max(math.max(0f, Cooldown), travel) + t.EnemyWindup,
+                EnemyState.Recover => math.max(0f, Timer) + math.max(t.EnemyCooldownMin, travel) + t.EnemyWindup,
+                _ => math.max(0f, Timer) + math.max(t.EnemyCooldownMin * 0.5f, travel) + t.EnemyWindup,
+            };
+        }
     }
 
     /// <summary>倒れて消えるまでの演出中。各システムはこれを持つ敵を無視する。</summary>
