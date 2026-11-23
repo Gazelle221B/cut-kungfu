@@ -73,12 +73,17 @@ namespace CutKungfu.Gameplay
                 bool isCut = req.Kind == StrikeKind.Cut;
                 float damage = req.Damage;
                 bool capped = false;
+                float hitStun = req.HitStun;
                 if (isCut && CutRules.CountsTowardAreaCap(tuning, req.Brick, isAimedTarget: entity == req.AimedTarget))
+                {
                     damage = CapAreaDamage(ref state, entity, f.MaxHealth, req.Damage, tuning, out capped);
+                    // 範囲技で当てた敵の被弾硬直は別の値(予備動作を潰すかどうかを調整できる)
+                    hitStun = tuning.EnemyAreaHitStun;
+                }
 
                 f.Health -= damage;
                 f.Flash = 0.12f;
-                f.HitStun = math.max(f.HitStun, req.HitStun);
+                f.HitStun = math.max(f.HitStun, hitStun);
                 kbRef.ValueRW.Velocity = Push(req, p) * req.Knockback;
                 hitStop.Request(req.HitStop);
                 shake.Add(isCut ? 0.35f : 0.12f);

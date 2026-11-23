@@ -112,6 +112,11 @@ namespace CutKungfu.Core
         public float EnemyKnockback;
         public float EnemyHitStun;
         public float EnemyCutHitStun;
+        /// <summary>
+        /// 範囲技(上限 AreaDamageCapRatio の対象になる打撃)で当てた敵の被弾硬直[s]。狙った敵への単体の打撃は EnemyCutHitStun。
+        /// 被弾硬直は予備動作を潰すので、これを短くすると、範囲技で削った敵が技の途中で殴り返せる。
+        /// </summary>
+        public float EnemyAreaHitStun;
         public float EnemyStaggerOnParry;
         public int EnemyMaxConcurrentWindups;
 
@@ -218,6 +223,7 @@ namespace CutKungfu.Core
             EnemyKnockback = 5f,
             EnemyHitStun = 0.3f,
             EnemyCutHitStun = 0.8f,
+            EnemyAreaHitStun = 0.8f,
             EnemyStaggerOnParry = 1.2f,
             EnemyMaxConcurrentWindups = 2,
 
