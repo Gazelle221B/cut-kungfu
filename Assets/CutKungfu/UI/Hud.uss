@@ -222,7 +222,16 @@
 .world-label--windup { color: #FFFFFF; background-color: var(--danger); }
 .world-label--ghost { color: var(--ink); background-color: var(--cyan); padding: 0 6px; border-radius: 10px; font-size: 15px; }
 .world-label--popup { font-size: 22px; translate: -50% -50%; }
-.world-label--popup-cut { color: var(--cyan); font-size: 26px; }
+.world-label--popup-cut {
+    /* 上限表示と同じく、明るい床でも読めるよう濃い縁取りと半透明の暗い下地 */
+    color: var(--cyan);
+    font-size: 26px;
+    -unity-text-outline-width: 2px;
+    -unity-text-outline-color: var(--ink);
+    background-color: rgba(27, 23, 20, 0.72);
+    padding: 0 6px;
+    border-radius: 4px;
+}
 .world-label--popup-hurt { color: var(--danger); }
 .world-label--popup-parry { color: var(--mustard); font-size: 28px; }
 

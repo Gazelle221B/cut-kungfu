@@ -67,8 +67,10 @@ namespace CutKungfu.Tests
             public float3 Player;
             public float[] EnemyAngles;
             /// <summary>
-            /// 既知の問題(範囲技+単体技): ゲージ60(4個技)で、範囲技1発で3体を削り、残る単体技3発で1体ずつとどめを刺すと全滅できる
+            /// 既知の問題(範囲技+単体技): ゲージ60(4個技)で、範囲技1つで3体を削り、単体技3つを別々の敵に当てて1体ずつとどめを刺すと全滅できる
             /// (机の左脇 2通り、机の手前 3通り)。範囲技の上限の対象外の打撃で起きるため、直し方の判断待ち。
+            /// 深刻さ(Measure_KnownWipes_UnderEnemyPressure、種 20 通り×5並び): 敵の攻撃開始を乱数で振っても、待ちのみなら 100 回中 96 回、
+            /// 技を出す時点で予備動作中の敵を含めても 85 回は出し切って全滅。中断は 0 回 / 9 回で、いずれも攻撃直前の敵が最初の範囲技より先に殴った場合。
             /// </summary>
             public bool KnownWipeByAreaThenThreeFinishers;
             public override string ToString() => Name;
@@ -111,21 +113,7 @@ namespace CutKungfu.Tests
                 w.Step();
                 w.SetGauge(gauge);
 
-                var spawns = EnemySpawns(setup);
-                float2 tablePoint = math.clamp(setup.Player.xz, table.Center - table.HalfExtents + 0.2f, table.Center + table.HalfExtents - 0.2f);
-                var poses = new (BrickKind, float3)[seq.Length];
-                int flyTarget = 0;
-                for (int i = 0; i < seq.Length; i++)
-                {
-                    poses[i] = seq[i] switch
-                    {
-                        S => (S, setup.Player),
-                        T => (T, new float3(tablePoint.x, table.TopY, tablePoint.y)),
-                        _ => (F, spawns[flyTarget++ % spawns.Length]),
-                    };
-                }
-
-                w.PerformCut(poses);
+                w.PerformCut(PosesFor(setup, seq));
                 var cut = w.Em.GetComponentData<CutState>(w.Player);
                 if (cut.Phase != CutPhase.Executing) continue; // 1個も置けなかった
                 string placed = BrickSequence.ToCodeString(cut.Record.Sequence);
@@ -151,7 +139,9 @@ namespace CutKungfu.Tests
             {
                 var data = new TestCaseData(setup, gauge).SetName($"AreaThenPalmFinish_CannotWipeTheSurround({setup.Name}, ゲージ{gauge})");
                 if (setup.KnownWipeByAreaThenThreeFinishers && gauge >= 60f)
-                    data = data.Ignore("既知の問題: 範囲技1発+単体技3発で全滅できる(机の左脇2通り・机の手前3通り、PR #1 で報告済み)。直し方が決まったら外す");
+                    data = data.Ignore("既知の問題: ゲージ60(4個技)で、範囲技1つ+単体技3つを別々の敵に当てると全滅できる(机の左脇2通り・机の手前3通り)。" +
+                                       "敵の攻撃開始を乱数で振っても100回中96回(予備動作中の敵を含めて85回)は出し切って全滅、中断は0回(9回)" +
+                                       "(Measure_KnownWipes_UnderEnemyPressure)。直し方が決まったら外す");
                 yield return data;
             }
         }
@@ -183,30 +173,7 @@ namespace CutKungfu.Tests
                 w.Step();
                 w.SetGauge(gauge);
 
-                var spawns = EnemySpawns(setup);
-                float2 tablePoint = math.clamp(setup.Player.xz, table.Center - table.HalfExtents + 0.2f, table.Center + table.HalfExtents - 0.2f);
-                var poses = new (BrickKind, float3)[seq.Length];
-                int flyTarget = 0, palmTarget = 0;
-                for (int i = 0; i < seq.Length; i++)
-                {
-                    if (seq[i] == P)
-                    {
-                        float3 enemy = spawns[palmTarget++ % spawns.Length];
-                        float3 toward = math.normalizesafe(enemy - setup.Player);
-                        poses[i] = (P, enemy - toward * 0.7f);
-                    }
-                    else
-                    {
-                        poses[i] = seq[i] switch
-                        {
-                            S => (S, setup.Player),
-                            T => (T, new float3(tablePoint.x, table.TopY, tablePoint.y)),
-                            _ => (F, spawns[flyTarget++ % spawns.Length]),
-                        };
-                    }
-                }
-
-                w.PerformCut(poses);
+                w.PerformCut(PosesFor(setup, seq));
                 var cut = w.Em.GetComponentData<CutState>(w.Player);
                 if (cut.Phase != CutPhase.Executing) continue;
                 string placed = BrickSequence.ToCodeString(cut.Record.Sequence);
@@ -233,6 +200,160 @@ namespace CutKungfu.Tests
             TestContext.WriteLine(summary);
             Assert.That(runs, Is.GreaterThan(0));
             Assert.That(wipes, Is.Empty, "1回の技で包囲を全滅できる並び:\n" + summary);
+        }
+
+        /// <summary>範囲技1発+単体技3発で全滅できる既知の5通り(AreaThenPalmFinish_CannotWipeTheSurround の Ignore 2ケース)。</summary>
+        static readonly (int setup, BrickKind[] seq)[] KnownWipes =
+        {
+            (0, new[] { S, F, P, F }),
+            (0, new[] { S, F, P, P }),
+            (1, new[] { S, F, P, F }),
+            (1, new[] { S, F, P, P }),
+            (1, new[] { T, F, P, P }),
+        };
+
+        const int PressureSeeds = 20;
+
+        /// <summary>
+        /// 計測用(合否なし): 既知の全滅5通りを、敵が技の実行中に攻撃してくる条件で流す。
+        /// 回帰テストの設定では、ウェーブ開始直後の敵は最初の攻撃まで 2.4 秒以上かかり、実行(約1秒)中には届かない。
+        /// ここでは技を出す直前に、各敵の攻撃開始の時刻を乱数の種ごとに振る(種は条件ごとに 20 通り)。
+        /// 条件「待ちのみ」: 予備動作に入るまでの待ち(EnemyBrain.Cooldown)を 0〜EnemyCooldownMax。
+        /// 条件「予備動作中を含む」: 攻撃開始の時刻を -EnemyWindup〜EnemyCooldownMax で振り、負なら技を出す時点ですでに予備動作中
+        /// (残り EnemyWindup+時刻)。同時に予備動作に入れる数(2)は守る。予備動作の長さ(0.9 秒)はそのまま。ゲージは 60(4個技)。
+        /// </summary>
+        [Explicit("計測用: 既知の全滅5通りを、敵の攻撃開始を乱数で振って流す(合否なし)")]
+        [Test]
+        public void Measure_KnownWipes_UnderEnemyPressure()
+        {
+            var tuning = Tuning.Default;
+            var report = new StringBuilder();
+            report.Append("配置 | 並び | 基準(回帰テストと同じ) | 出し切って全滅 | 途中で中断 | 出し切ったが全滅せず | 置けず | 実行中に予備動作 | 実行中の被弾\n");
+
+            foreach (bool includeWindups in new[] { false, true })
+            {
+            report.Append(includeWindups ? "\n[条件: 予備動作中を含む]\n" : "[条件: 待ちのみ]\n");
+            foreach (var (setupIndex, seq) in KnownWipes)
+            {
+                var setup = Setups[setupIndex];
+                string label = BrickSequence.ToCodeString(Pack(seq));
+                var baseline = RunUnderPressure(setup, seq, seed: 0, includeWindups, tuning);
+                int wiped = 0, interrupted = 0, survived = 0, unplaced = 0, windups = 0, hits = 0;
+                for (int seed = 1; seed <= PressureSeeds; seed++)
+                {
+                    var r = RunUnderPressure(setup, seq, seed, includeWindups, tuning);
+                    if (!r.Placed) { unplaced++; continue; }
+                    if (r.Interrupted) interrupted++;
+                    else if (r.Alive == 0) wiped++;
+                    else survived++;
+                    if (r.WindupDuringExecution) windups++;
+                    if (r.HitsDuringExecution > 0) hits++;
+                }
+                report.Append($"{setup.Name} | {label} | {baseline.Outcome} | {wiped} | {interrupted} | {survived} | {unplaced} | {windups}/{PressureSeeds} | {hits}/{PressureSeeds}\n");
+            }
+            }
+
+            TestContext.WriteLine(report.ToString());
+            UnityEngine.Debug.Log("[PRESSURE]\n" + report);
+            Assert.Pass(report.ToString());
+        }
+
+        struct PressureResult
+        {
+            public bool Placed;
+            public bool Interrupted;
+            public int Alive;
+            public bool WindupDuringExecution;
+            public int HitsDuringExecution;
+
+            public string Outcome => !Placed ? "置けず" : Interrupted ? "途中で中断" : Alive == 0 ? "出し切って全滅" : $"出し切ったが {Alive} 体残る";
+        }
+
+        static PressureResult RunUnderPressure(SurroundSetup setup, BrickKind[] seq, int seed, bool includeWindups, in Tuning tuning)
+        {
+            using var w = SurroundedAt(setup);
+            w.AddTable(GameplayTestWorld.StageTable);
+            w.Step();
+            w.SetGauge(60f);
+
+            if (seed > 0)
+            {
+                var rng = Unity.Mathematics.Random.CreateFromIndex((uint)(seed + (includeWindups ? 1000 : 0)));
+                int windupsSet = 0;
+                foreach (var e in w.Enemies())
+                {
+                    var brain = w.Em.GetComponentData<EnemyBrain>(e);
+                    float start = rng.NextFloat(includeWindups ? -tuning.EnemyWindup : 0f, tuning.EnemyCooldownMax);
+                    if (start < 0f && windupsSet < tuning.EnemyMaxConcurrentWindups)
+                    {
+                        brain.State = EnemyState.Windup;
+                        brain.Timer = tuning.EnemyWindup + start;
+                        windupsSet++;
+                    }
+                    else
+                    {
+                        brain.Cooldown = math.max(0f, start);
+                    }
+                    w.Em.SetComponentData(e, brain);
+                }
+            }
+
+            w.PerformCut(PosesFor(setup, seq));
+            var result = new PressureResult();
+            var cut = w.Em.GetComponentData<CutState>(w.Player);
+            result.Placed = cut.Phase == CutPhase.Executing && cut.Record.Sequence == Pack(seq);
+            if (!result.Placed) return result;
+
+            for (int i = 0; i < 300 && w.Em.GetComponentData<CutState>(w.Player).Phase == CutPhase.Executing; i++)
+            {
+                w.Step();
+                foreach (var e in w.Enemies())
+                    if (w.Em.GetComponentData<EnemyBrain>(e).State == EnemyState.Windup) result.WindupDuringExecution = true;
+            }
+
+            foreach (var t in w.Em.GetBuffer<TelemetryEvent>(w.Em.CreateEntityQuery(typeof(TelemetryEvent)).GetSingletonEntity()))
+            {
+                if (t.Value.Kind == PlaytestEventKind.PlayerHit) result.HitsDuringExecution++;
+                if (t.Value.Kind == PlaytestEventKind.Cut && t.Value.Interrupted) result.Interrupted = true;
+            }
+            result.Alive = w.AliveEnemies();
+            return result;
+        }
+
+        static int Pack(BrickKind[] seq)
+        {
+            int packed = 0;
+            foreach (var k in seq) packed = BrickSequence.Append(packed, k);
+            return packed;
+        }
+
+        /// <summary>
+        /// 探索で使う置き場所の規則: 回し蹴り=自分の位置、机上の着地=天板で自分に最も近い点、
+        /// 飛び蹴り=敵を順に狙う、掌底=狙う敵の手前(自分側へ 0.7m)で敵を順に狙う。
+        /// </summary>
+        static (BrickKind, float3)[] PosesFor(SurroundSetup setup, BrickKind[] seq)
+        {
+            var table = GameplayTestWorld.StageTable;
+            var spawns = EnemySpawns(setup);
+            float2 tablePoint = math.clamp(setup.Player.xz, table.Center - table.HalfExtents + 0.2f, table.Center + table.HalfExtents - 0.2f);
+            var poses = new (BrickKind, float3)[seq.Length];
+            int flyTarget = 0, palmTarget = 0;
+            for (int i = 0; i < seq.Length; i++)
+            {
+                if (seq[i] == P)
+                {
+                    float3 enemy = spawns[palmTarget++ % spawns.Length];
+                    poses[i] = (P, enemy - math.normalizesafe(enemy - setup.Player) * 0.7f);
+                    continue;
+                }
+                poses[i] = seq[i] switch
+                {
+                    S => (S, setup.Player),
+                    T => (T, new float3(tablePoint.x, table.TopY, tablePoint.y)),
+                    _ => (F, spawns[flyTarget++ % spawns.Length]),
+                };
+            }
+            return poses;
         }
 
         static GameplayTestWorld SurroundedAt(SurroundSetup setup) => new GameplayTestWorld(setup.Player, EnemySpawns(setup));
@@ -315,6 +436,32 @@ namespace CutKungfu.Tests
             for (int i = 0; i < 300 && w.Em.GetComponentData<CutState>(w.Player).Phase == CutPhase.Executing; i++) w.Step();
 
             Assert.That(w.AliveEnemies(), Is.Zero, label);
+        }
+
+        /// <summary>1回の技で3体撃破した件数は、CSV の kind=cut 行の kills 列で数えられる(既知の全滅の並びで確かめる)。</summary>
+        [Test]
+        public void ThreeKillCut_IsRecordedAsKillsThree()
+        {
+            var (setupIndex, seq) = KnownWipes[1];
+            var setup = Setups[setupIndex];
+            using var w = SurroundedAt(setup);
+            w.AddTable(GameplayTestWorld.StageTable);
+            w.Step();
+            w.SetGauge(60f);
+            w.PerformCut(PosesFor(setup, seq));
+
+            PlaytestEvent cutRow = default;
+            bool found = false;
+            for (int i = 0; i < 600 && !found; i++)
+            {
+                w.Step();
+                foreach (var t in w.Em.GetBuffer<TelemetryEvent>(w.Em.CreateEntityQuery(typeof(TelemetryEvent)).GetSingletonEntity()))
+                    if (t.Value.Kind == PlaytestEventKind.Cut) { cutRow = t.Value; found = true; }
+            }
+            Assert.That(found, Is.True, "技の記録が出ていない");
+            Assert.That(cutRow.Kills, Is.EqualTo(3));
+            Assert.That(cutRow.EnemiesAlive, Is.EqualTo(3));
+            StringAssert.Contains(",3,", PlaytestCsv.ToRow(cutRow));
         }
 
         [Test]
