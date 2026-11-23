@@ -34,7 +34,7 @@ namespace CutKungfu.Gameplay
                 .Build(ref state);
         }
 
-        [BurstCompile]
+        // ウェーブの組み直しで動作生成ソース(managed)の計画を捨てるので Burst にしない
         public void OnUpdate(ref SystemState state)
         {
             var input = SystemAPI.GetSingleton<PlayerInput>();
@@ -160,7 +160,9 @@ namespace CutKungfu.Gameplay
             em.SetComponentData(player, new Knockback());
             em.SetComponentData(player, new VerticalBody());
             em.SetComponentData(player, new CutState { SelectedKind = cut.SelectedKind });
-            em.GetBuffer<PlacedPose>(player).Clear();
+            var placed = em.GetBuffer<PlacedPose>(player);
+            state.World.GetOrCreateSystemManaged<CutMotionService>().Discard(placed);
+            placed.Clear();
 
             SystemAPI.GetSingletonRW<HitStop>().ValueRW.Remaining = 0f;
             SystemAPI.GetSingletonBuffer<DamageRequest>().Clear();

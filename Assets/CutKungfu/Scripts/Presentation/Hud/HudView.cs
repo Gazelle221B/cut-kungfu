@@ -208,7 +208,8 @@ namespace CutKungfu.Presentation
                 _filmFrames[i].style.display = i < frames ? DisplayStyle.Flex : DisplayStyle.None;
                 _filmFrames[i].EnableInClassList("film-strip__frame--spent", i >= alive);
             }
-            _filmLabel.text = $"硬直 {remaining:0.0}s";
+            // スロー中は、技を出し切るまでの時間(計画した動きの長さの合計)も添える
+            _filmLabel.text = slow ? $"硬直 {remaining:0.0}s (技 {s.PlannedExecution:0.0}s の後)" : $"硬直 {remaining:0.0}s";
             // 硬直は最後のポーズの位置で起きるので、帯もそこに出す
             var at = slow ? s.CommitPosition : s.PlayerPosition;
             var p = RuntimePanelUtils.CameraTransformWorldToPanel(panel, at + Vector3.down * 0.15f, cam);
