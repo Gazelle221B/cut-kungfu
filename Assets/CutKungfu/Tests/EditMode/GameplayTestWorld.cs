@@ -64,7 +64,7 @@ namespace CutKungfu.Tests
             }
 
             // 実行時と同じく、トランスフォーム更新も同じグループに置く。
-            // 無いと GameplaySystemGroup の [UpdateBefore(TransformSystemGroup)] が「対象がいない」として無視され、警告が出る
+            // 表示の補間(SmoothingApplySystem)の [UpdateBefore(TransformSystemGroup)] の対象にもなる
             var transforms = World.GetOrCreateSystemManaged<TransformSystemGroup>();
             sim.AddSystemToUpdateList(transforms);
             transforms.AddSystemToUpdateList(World.CreateSystem<ParentSystem>());
