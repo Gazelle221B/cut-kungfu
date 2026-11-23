@@ -39,6 +39,13 @@ namespace CutKungfu.Tests
                 gameplay.AddSystemToUpdateList(World.CreateSystem(t));
             // 動作生成の差し替え口(更新しない managed システム)。テストはここで差し替えられる
             World.GetOrCreateSystemManaged<CutMotionService>();
+
+            // 実行時と同じく、トランスフォーム更新も同じグループに置く。
+            // 無いと GameplaySystemGroup の [UpdateBefore(TransformSystemGroup)] が「対象がいない」として無視され、警告が出る
+            var transforms = World.GetOrCreateSystemManaged<TransformSystemGroup>();
+            sim.AddSystemToUpdateList(transforms);
+            transforms.AddSystemToUpdateList(World.CreateSystem<ParentSystem>());
+            transforms.AddSystemToUpdateList(World.CreateSystem<LocalToWorldSystem>());
             sim.SortSystems();
             init.SortSystems();
 
@@ -78,6 +85,19 @@ namespace CutKungfu.Tests
         }
 
         public NativeArray<Entity> Enemies() => Em.CreateEntityQuery(typeof(EnemyTag)).ToEntityArray(Allocator.Temp);
+
+        /// <summary>机(地形連携の対象)を置く。ステージと同じ寸法にするなら <see cref="StageTable"/>。</summary>
+        public void AddTable(TableRect rect)
+        {
+            var e = Em.CreateEntity();
+            Em.AddComponentData(e, new TableSingleton { Rect = rect });
+        }
+
+        /// <summary>試作ステージの屋台の机(PrototypeBuilder と同じ: 中心 (3, 0.8)、2.4×1.2、高さ 0.8)。</summary>
+        public static TableRect StageTable => new TableRect
+        {
+            Exists = true, Center = new float2(3f, 0.8f), HalfExtents = new float2(1.2f, 0.6f), TopY = 0.8f,
+        };
 
         public void SetGauge(float value)
         {
