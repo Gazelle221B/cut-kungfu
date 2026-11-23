@@ -109,7 +109,9 @@ namespace CutKungfu.Gameplay
             float3 at, float3 facing)
         {
             float2 center = at.xz + facing.xz * brick.StrikeForward;
-            bool found = NearestEnemy(ref state, center, out float2 nearest);
+            bool found = NearestEnemy(ref state, center, out float2 nearest, out Entity nearestEntity);
+            // 命中補正が効く距離にいる最寄りの敵を「到達点で狙った敵」とする(飛び蹴りの巻き込みと区別するため)
+            Entity aimed = found && math.distance(nearest, center) <= brick.StrikeRadius + tuning.StrikeAssist ? nearestEntity : Entity.Null;
             center = CutRules.AssistStrikeCenter(center, brick.StrikeRadius, tuning.StrikeAssist, nearest, found);
             SystemAPI.GetSingletonBuffer<DamageRequest>().Add(new DamageRequest
             {
@@ -125,6 +127,7 @@ namespace CutKungfu.Gameplay
                 HitStun = tuning.EnemyCutHitStun,
                 HitStop = tuning.HitStopCut,
                 FallbackDirection = facing.xz,
+                AimedTarget = aimed,
             });
         }
 
@@ -143,14 +146,15 @@ namespace CutKungfu.Gameplay
             cut = new CutState { SelectedKind = cut.SelectedKind };
         }
 
-        bool NearestEnemy(ref SystemState state, float2 from, out float2 nearest)
+        bool NearestEnemy(ref SystemState state, float2 from, out float2 nearest, out Entity entity)
         {
             nearest = default;
+            entity = Entity.Null;
             float best = float.MaxValue;
-            foreach (var lt in SystemAPI.Query<RefRO<LocalTransform>>().WithAll<EnemyTag>().WithNone<Dying>())
+            foreach (var (lt, e) in SystemAPI.Query<RefRO<LocalTransform>>().WithAll<EnemyTag>().WithNone<Dying>().WithEntityAccess())
             {
                 float d = math.distancesq(lt.ValueRO.Position.xz, from);
-                if (d < best) { best = d; nearest = lt.ValueRO.Position.xz; }
+                if (d < best) { best = d; nearest = lt.ValueRO.Position.xz; entity = e; }
             }
             return best < float.MaxValue;
         }

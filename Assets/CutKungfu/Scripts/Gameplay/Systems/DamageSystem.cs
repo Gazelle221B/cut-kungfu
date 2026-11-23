@@ -73,7 +73,7 @@ namespace CutKungfu.Gameplay
                 bool isCut = req.Kind == StrikeKind.Cut;
                 float damage = req.Damage;
                 bool capped = false;
-                if (isCut && CutRules.IsAreaBrick(req.Brick))
+                if (isCut && CutRules.CountsTowardAreaCap(tuning, req.Brick, isAimedTarget: entity == req.AimedTarget))
                     damage = CapAreaDamage(ref state, entity, f.MaxHealth, req.Damage, tuning, out capped);
 
                 f.Health -= damage;

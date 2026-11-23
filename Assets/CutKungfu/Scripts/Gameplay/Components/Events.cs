@@ -31,6 +31,10 @@ namespace CutKungfu.Gameplay
         public float Knockback;
         public float HitStun;
         public float HitStop;
+        /// <summary>
+        /// 到達点で狙った敵(命中補正の相手)。経路も判定になる技で、狙った敵と巻き込んだ敵を区別する。いなければ Entity.Null。
+        /// </summary>
+        public Entity AimedTarget;
         /// <summary>当たった相手が中心にいたときの吹き飛ばし方向。</summary>
         public float2 FallbackDirection;
     }

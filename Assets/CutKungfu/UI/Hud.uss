@@ -270,4 +270,13 @@
 .brick__repeat { font-size: 12px; color: var(--danger); -unity-font-style: bold; }
 
 /* 範囲技の上限に掛かった打撃: 削られたことを灰色で見せる */
-.world-label--popup-capped { color: #B8B0A4; font-size: 22px; }
+.world-label--popup-capped {
+    /* 明るい床でも暗い壁でも読めるよう、灰色の文字に濃い縁取りと半透明の暗い下地 */
+    color: #D9D3C9;
+    font-size: 22px;
+    -unity-text-outline-width: 2px;
+    -unity-text-outline-color: var(--ink);
+    background-color: rgba(27, 23, 20, 0.72);
+    padding: 0 6px;
+    border-radius: 4px;
+}
