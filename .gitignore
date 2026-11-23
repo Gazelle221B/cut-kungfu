@@ -115,3 +115,8 @@ InitTestScene*.unity*
 
 # Cut Kungfu playtest logs (local only)
 /Playtests/
+
+# Local agent tooling state
+.omc/
+.concord/
+.specstory/
