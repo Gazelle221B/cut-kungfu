@@ -75,9 +75,10 @@ namespace CutKungfu.Tests
         enum Outcome { HitDuringExecution, HitDuringCommit, NotHit, NotPlaced }
 
         /// <summary>
-        /// 1回流す。技を出す直前に各敵の攻撃開始を乱数で振る(-EnemyWindup〜EnemyCooldownMax、負なら予備動作中。同時に2体まで)。
+        /// 1回流す。技を出す直前に各敵の攻撃開始を乱数で振る。予備動作中を含む: -EnemyWindup〜EnemyCooldownMax(負なら予備動作中。同時に2体まで)。
+        /// 待ちのみ: 0〜EnemyCooldownMax。
         /// </summary>
-        static Outcome Run(Plan plan, int seed, in Tuning tuning, bool commitEnabled)
+        static Outcome Run(Plan plan, int seed, in Tuning tuning, bool commitEnabled, bool includeWindups = true)
         {
             using var w = new GameplayTestWorld(Player, Enemy(0), Enemy(1), Enemy(2));
             var ts = w.Singleton<TuningSingleton>();
@@ -94,7 +95,7 @@ namespace CutKungfu.Tests
             foreach (var e in w.Enemies())
             {
                 var brain = w.Em.GetComponentData<EnemyBrain>(e);
-                float start = rng.NextFloat(-tuning.EnemyWindup, tuning.EnemyCooldownMax);
+                float start = rng.NextFloat(includeWindups ? -tuning.EnemyWindup : 0f, tuning.EnemyCooldownMax);
                 if (start < 0f && windups < tuning.EnemyMaxConcurrentWindups)
                 {
                     brain.State = EnemyState.Windup;
@@ -133,13 +134,15 @@ namespace CutKungfu.Tests
         }
 
         /// <summary>置く数ごとの件数(実行中に被弾 / 硬直中に被弾 / 被弾なし)。各置く数 3並び×種 Seeds 通り。</summary>
-        static int[,] Measure(in Tuning tuning, bool commitEnabled)
+        /// <param name="onlyPoses">0 ならすべての置く数、1〜4 ならその置く数だけ。</param>
+        static int[,] Measure(in Tuning tuning, bool commitEnabled, bool includeWindups = true, int onlyPoses = 0)
         {
             var counts = new int[4, 4];
             for (int n = 0; n < 4; n++)
+            if (onlyPoses == 0 || onlyPoses == n + 1)
             foreach (var plan in PlansByCount[n])
             for (int seed = 1; seed <= Seeds; seed++)
-                counts[n, (int)Run(plan, seed, tuning, commitEnabled)]++;
+                counts[n, (int)Run(plan, seed, tuning, commitEnabled, includeWindups)]++;
             return counts;
         }
 
@@ -154,13 +157,26 @@ namespace CutKungfu.Tests
             }
         }
 
-        /// <summary>計測用(合否なし): 現状の調整値で、置く数ごとの被弾を測る(条件A=コミット時間あり)。</summary>
+        /// <summary>計測用(合否なし): 既定の調整値で、置く数ごとの被弾を測る(条件A の2条件と、条件B の4個技)。</summary>
         [Explicit("計測用: 包囲で置く数ごとの、実行中・硬直中の被弾を測る(合否なし)")]
         [Test]
         public void Measure_CommitPunishmentByPoseCount()
         {
-            var sb = new StringBuilder("[条件A・現状の調整値]\n");
+            var sb = new StringBuilder("[条件A・予備動作中を含む]\n");
             AppendTable(sb, Measure(Tuning.Default, commitEnabled: true));
+            sb.Append("\n[条件A・待ちのみ]\n");
+            AppendTable(sb, Measure(Tuning.Default, commitEnabled: true, includeWindups: false));
+            sb.Append("4個技の並び別(待ちのみ): ");
+            foreach (var plan in PlansByCount[3])
+            {
+                int commitHits = 0;
+                for (int seed = 1; seed <= Seeds; seed++)
+                    if (Run(plan, seed, Tuning.Default, commitEnabled: true, includeWindups: false) == Outcome.HitDuringCommit) commitHits++;
+                sb.Append($"{plan.Name} 硬直中に被弾 {commitHits}/{Seeds}  ");
+            }
+            sb.Append('\n');
+            var b = Measure(Tuning.Default, commitEnabled: false, onlyPoses: 4);
+            sb.Append($"\n[条件B・予備動作中を含む] 4個技: 実行中に被弾 {b[3, 0]} / 硬直中に被弾 {b[3, 1]} / 被弾なし {b[3, 2]}\n");
             TestContext.WriteLine(sb.ToString());
             UnityEngine.Debug.Log("[PUNISH]\n" + sb);
             Assert.Pass(sb.ToString());
@@ -190,6 +206,24 @@ namespace CutKungfu.Tests
             TestContext.WriteLine(sb.ToString());
             UnityEngine.Debug.Log("[PUNISH-GRID]\n" + sb);
             Assert.Pass(sb.ToString());
+        }
+
+        /// <summary>
+        /// 回帰テスト(種を固定): 包囲で、4個技の硬直中の被弾が1〜3個技より明確に多い(最大の2倍以上)。
+        /// 条件B(コミット時間なし)では4個技でも硬直中の被弾は起きない。罰が届くのは4個目の硬直だけ、という現状の前提を守る。
+        /// </summary>
+        [Test]
+        public void FourPoseCommit_IsPunishedMoreThanSmallerCuts()
+        {
+            var a = Measure(Tuning.Default, commitEnabled: true);
+            int smallerMax = math.max(a[0, 1], math.max(a[1, 1], a[2, 1]));
+            var sb = new StringBuilder();
+            AppendTable(sb, a);
+            Assert.That(a[3, 1], Is.GreaterThan(0), sb.ToString());
+            Assert.That(a[3, 1], Is.GreaterThanOrEqualTo(2 * smallerMax), "4個技の硬直中の被弾が1〜3個技より明確に多くない:\n" + sb);
+
+            var b = Measure(Tuning.Default, commitEnabled: false, onlyPoses: 4);
+            Assert.That(b[3, 1], Is.Zero, "条件Bで硬直中に殴られた");
         }
 
         /// <summary>技の打撃を受けた敵は、被弾硬直のあと、残っていた待ちに EnemyWaitScaleAfterCutHit が掛かる。</summary>
