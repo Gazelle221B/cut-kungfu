@@ -25,6 +25,7 @@ namespace CutKungfu.Presentation
         readonly Label _wave, _take, _condition, _score, _gaugeLabel, _poseCount, _multiplier, _commitPreview, _bannerText, _bannerSub, _statsBody;
         readonly VisualElement _hpFill, _gaugeFill, _gaugeCost, _gaugeThreshold, _slowPanel, _slowTimerFill, _banner, _stats;
         readonly Label[] _bricks = new Label[BrickKinds.Count];
+        readonly Label[] _brickRepeat = new Label[BrickKinds.Count];
         readonly VisualElement[] _brickBoxes = new VisualElement[BrickKinds.Count];
 
         readonly LabelPool _enemyLabels;
@@ -81,8 +82,12 @@ namespace CutKungfu.Presentation
                 key.AddToClassList("brick__key");
                 var name = new Label(BrickKinds.DisplayName((BrickKind)i));
                 name.AddToClassList("brick__name");
+                var repeat = new Label();
+                repeat.AddToClassList("brick__repeat");
                 box.Add(key);
                 box.Add(name);
+                box.Add(repeat);
+                _brickRepeat[i] = repeat;
                 bricks.Add(box);
                 _brickBoxes[i] = box;
                 _bricks[i] = name;
@@ -133,7 +138,14 @@ namespace CutKungfu.Presentation
                     ? "ポーズを置いてください"
                     : $"硬直 {s.CommitIfReleased.ToString("0.0", c)}s" + (canPlaceMore ? $" (+1で {s.CommitIfOneMore.ToString("0.0", c)}s)" : "");
                 for (int i = 0; i < BrickKinds.Count; i++)
+                {
                     _brickBoxes[i].EnableInClassList("brick--selected", (int)s.SelectedKind == i);
+                    // 同じブリックを繰り返すと威力が下がる: 次に置いたときの倍率を出す
+                    int uses = s.BrickUses[i];
+                    bool decays = uses > 0 && s.RepeatBrickScale < 1f;
+                    _brickRepeat[i].text = decays ? $"繰り返し ×{Mathf.Pow(s.RepeatBrickScale, uses).ToString("0.##", c)}" : "";
+                    _brickRepeat[i].style.display = decays ? DisplayStyle.Flex : DisplayStyle.None;
+                }
             }
             else
             {

@@ -83,9 +83,14 @@ namespace CutKungfu.Core
         public static float SegmentDuration(in Tuning t, float distance)
             => math.clamp(distance / math.max(0.01f, t.CutDashSpeed), t.CutSegmentMin, t.CutSegmentMax);
 
-        /// <summary>カット技1打のダメージ。倍率はその技全体のポーズ数で決まる。</summary>
-        public static float StrikeDamage(in Tuning t, BrickKind kind, int poseCountInCut)
-            => t.CutBaseDamage * t.GetBrick(kind).DamageScale * PowerMultiplier(t, poseCountInCut);
+        /// <summary>
+        /// カット技1打のダメージ。倍率はその技全体のポーズ数で決まる。
+        /// 同じ技の中で同じブリックを繰り返すと、繰り返すたびに <see cref="Tuning.RepeatBrickScale"/> を掛ける。
+        /// </summary>
+        /// <param name="repeatIndex">この技の中で、同じブリックを前に何回置いたか(初回は 0)。</param>
+        public static float StrikeDamage(in Tuning t, BrickKind kind, int poseCountInCut, int repeatIndex = 0)
+            => t.CutBaseDamage * t.GetBrick(kind).DamageScale * PowerMultiplier(t, poseCountInCut)
+               * math.pow(math.max(0f, t.RepeatBrickScale), math.max(0, repeatIndex));
 
         /// <summary>
         /// 命中補正: 打点から (判定半径+assist) 以内に敵がいれば、打点を最大 assist だけその敵へ寄せる。

@@ -126,7 +126,7 @@ namespace CutKungfu.Gameplay
                 A = brick.SweepPath ? cut.SegmentFrom.xz : center,
                 B = center,
                 Radius = brick.StrikeRadius,
-                Damage = CutRules.StrikeDamage(tuning, pose.Kind, cut.PoseCount),
+                Damage = CutRules.StrikeDamage(tuning, pose.Kind, cut.PoseCount, pose.RepeatIndex),
                 Knockback = brick.Knockback,
                 HitStun = tuning.EnemyCutHitStun,
                 HitStop = tuning.HitStopCut,

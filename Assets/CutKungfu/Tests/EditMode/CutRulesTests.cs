@@ -104,6 +104,25 @@ namespace CutKungfu.Tests
         }
 
         [Test]
+        public void StrikeDamage_RepeatedBrickInSameCut_IsScaledPerRepeat()
+        {
+            var t = T;
+            float first = CutRules.StrikeDamage(t, BrickKind.Spin, 4, repeatIndex: 0);
+            Assert.That(CutRules.StrikeDamage(t, BrickKind.Spin, 4, repeatIndex: 1), Is.EqualTo(first * t.RepeatBrickScale).Within(1e-4f));
+            Assert.That(CutRules.StrikeDamage(t, BrickKind.Spin, 4, repeatIndex: 2),
+                Is.EqualTo(first * t.RepeatBrickScale * t.RepeatBrickScale).Within(1e-4f));
+        }
+
+        [Test]
+        public void StrikeDamage_RepeatScaleOfOne_DisablesTheRule()
+        {
+            var t = T;
+            t.RepeatBrickScale = 1f;
+            Assert.That(CutRules.StrikeDamage(t, BrickKind.Spin, 4, repeatIndex: 3), Is.EqualTo(CutRules.StrikeDamage(t, BrickKind.Spin, 4)).Within(1e-4f));
+        }
+
+
+        [Test]
         public void SegmentDuration_IsClamped()
         {
             Assert.That(CutRules.SegmentDuration(T, 0f), Is.EqualTo(T.CutSegmentMin));
@@ -133,10 +152,13 @@ namespace CutKungfu.Tests
             float spreadPerEnemy = CutRules.StrikeDamage(t, BrickKind.Palm, 4);
             Assert.That(spreadPerEnemy, Is.LessThan(t.EnemyMaxHealth), "4ポーズを1体ずつに散らしても倒せない");
 
-            float focus3 = 3 * CutRules.StrikeDamage(t, BrickKind.Palm, 3);
+            // 同じブリックの繰り返しは減衰する。最も不利な「同じ掌底を3発」でも集中すれば倒せることを確かめる
+            float focus3 = 0f;
+            for (int k = 0; k < 3; k++) focus3 += CutRules.StrikeDamage(t, BrickKind.Palm, 3, repeatIndex: k);
             Assert.That(focus3, Is.GreaterThanOrEqualTo(t.EnemyMaxHealth), "3ポーズを1体に集中すれば倒せる");
 
-            float focus2 = 2 * CutRules.StrikeDamage(t, BrickKind.Palm, 2);
+            // 2ポーズで最も強い組み合わせ(減衰しない別々のブリック: 掌底+飛び蹴り)でも倒しきれない
+            float focus2 = CutRules.StrikeDamage(t, BrickKind.Palm, 2) + CutRules.StrikeDamage(t, BrickKind.FlyingKick, 2);
             Assert.That(focus2, Is.LessThan(t.EnemyMaxHealth), "2ポーズでは倒しきれない");
         }
     }

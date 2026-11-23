@@ -149,7 +149,11 @@ namespace CutKungfu.Gameplay
                     var lib = SystemAPI.GetSingleton<PrefabLibrary>();
                     var ghost = SpawnGhost(ref state, lib.Ghost(cut.SelectedKind), pos, yaw, placed, false, PlacedColor);
                     cut.Record.Sequence = BrickSequence.Append(cut.Record.Sequence, cut.SelectedKind);
-                    SystemAPI.GetBuffer<PlacedPose>(player).Add(new PlacedPose { Kind = cut.SelectedKind, Position = pos, Yaw = yaw, Ghost = ghost });
+                    var placedPoses = SystemAPI.GetBuffer<PlacedPose>(player);
+                    int repeat = 0;
+                    for (int i = 0; i < placedPoses.Length; i++)
+                        if (placedPoses[i].Kind == cut.SelectedKind) repeat++;
+                    placedPoses.Add(new PlacedPose { Kind = cut.SelectedKind, Position = pos, Yaw = yaw, RepeatIndex = repeat, Ghost = ghost });
                     Feedback(ref state, FeedbackKind.PosePlaced, pos, placed + 1);
                     placed++;
                     // 置いた直後は次のアンカーで判定し直す

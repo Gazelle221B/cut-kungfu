@@ -59,6 +59,9 @@ namespace CutKungfu.Presentation
         public Vector3 CommitPosition;
         /// <summary>今解除した場合に無防備になる時間の終わり(実行時間+硬直, ゲーム秒)。</summary>
         public float VulnerableUntil;
+        /// <summary>この技の中で各ブリックを置いた回数(繰り返しの減衰の表示用)。</summary>
+        public readonly int[] BrickUses = new int[BrickKinds.Count];
+        public float RepeatBrickScale;
         public float MinGaugeToEnter;
         public float CostPerPose;
 

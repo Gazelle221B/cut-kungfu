@@ -61,6 +61,8 @@ namespace CutKungfu.Gameplay
         public BrickKind Kind;
         public float3 Position;
         public float Yaw;
+        /// <summary>この技の中で、同じブリックを前に何回置いたか(初回 0)。繰り返しの減衰に使う。</summary>
+        public int RepeatIndex;
         public Entity Ghost;
     }
 

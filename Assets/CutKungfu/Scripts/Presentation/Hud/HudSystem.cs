@@ -95,6 +95,9 @@ namespace CutKungfu.Presentation
                 from = poses[i].Position;
             }
             s.CommitPosition = from;
+            s.RepeatBrickScale = tuning.RepeatBrickScale;
+            System.Array.Clear(s.BrickUses, 0, s.BrickUses.Length);
+            for (int i = 0; i < poses.Length; i++) s.BrickUses[(int)poses[i].Kind]++;
             s.VulnerableUntil = cut.Phase == CutPhase.Slow && placed > 0 ? exec + s.CommitIfReleased : 0f;
 
             foreach (var (brain, lt) in SystemAPI.Query<RefRO<EnemyBrain>, RefRO<LocalTransform>>().WithAll<EnemyTag>().WithNone<Dying>())

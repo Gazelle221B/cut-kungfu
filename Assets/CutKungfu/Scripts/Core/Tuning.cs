@@ -57,6 +57,11 @@ namespace CutKungfu.Core
         public float CutDashSpeed;
         public float CutSegmentMin;
         public float CutSegmentMax;
+        /// <summary>
+        /// 同じ技の中で同じブリックを繰り返したときの威力の倍率(2回目は×s、3回目は×s²…)。1 で無効。
+        /// 範囲技を重ねて包囲を1回で全滅させる解を消すためのルール(SurroundBalanceTests)。
+        /// </summary>
+        public float RepeatBrickScale;
         /// <summary>打点を近くの敵へ寄せる最大距離[m](GDD 15章「拳が敵に当たらない」への補正層)。0 で無効。</summary>
         public float StrikeAssist;
         public bool InvulnerableDuringSlow;
@@ -146,6 +151,7 @@ namespace CutKungfu.Core
             CutDashSpeed = 16f,
             CutSegmentMin = 0.14f,
             CutSegmentMax = 0.38f,
+            RepeatBrickScale = 0.5f,
             StrikeAssist = 1.2f,
             InvulnerableDuringSlow = true,
             // 実行中も殴られる(TDD 7章「中断」)。スロー中に敵の予備動作を読む意味を残す
