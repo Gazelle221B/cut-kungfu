@@ -123,7 +123,9 @@ namespace CutKungfu.Tests
             var cut = w.Em.GetComponentData<CutState>(w.Player);
             if (cut.Phase != CutPhase.Executing || cut.PoseCount != poses.Length) return Outcome.NotPlaced;
 
-            bool hitInCommit = false;
+            bool hitInCommit = false, hitInExecution = false;
+            int playerHitsSeen = 0;
+            var telemetry = w.Em.CreateEntityQuery(typeof(TelemetryEvent)).GetSingletonEntity();
             var tracer = trace != null ? new Tracer(w, trace) : null;
             // 上限は実時間で決める(更新の回数で決めると、dt が小さいほど早く打ち切ってしまう)
             int maxSteps = (int)math.ceil(15f / dt);
@@ -134,63 +136,85 @@ namespace CutKungfu.Tests
                 if (!c.IsActive || w.Singleton<SessionState>().Phase != SessionPhase.Playing) break;
                 w.Step();
                 tracer?.Sample();
+                // 殴られた更新の終わりにまだ実行中なら「実行中に被弾」(ダメージの解決は技の進行の後なので、硬直に入った更新の被弾は硬直中)
+                int hits = 0;
+                foreach (var t in w.Em.GetBuffer<TelemetryEvent>(telemetry))
+                    if (t.Value.Kind == PlaytestEventKind.PlayerHit) hits++;
+                if (hits > playerHitsSeen && w.Em.GetComponentData<CutState>(w.Player).Phase == CutPhase.Executing) hitInExecution = true;
+                playerHitsSeen = hits;
             }
 
-            foreach (var t in w.Em.GetBuffer<TelemetryEvent>(w.Em.CreateEntityQuery(typeof(TelemetryEvent)).GetSingletonEntity()))
+            LastRunInterrupted = false;
+            foreach (var t in w.Em.GetBuffer<TelemetryEvent>(telemetry))
             {
-                if (t.Value.Kind == PlaytestEventKind.Cut && t.Value.Interrupted) return Outcome.HitDuringExecution;
+                if (t.Value.Kind == PlaytestEventKind.Cut && t.Value.Interrupted) LastRunInterrupted = true;
                 if (t.Value.Kind == PlaytestEventKind.Cut && t.Value.HitDuringCommit) hitInCommit = true;
             }
+            if (hitInExecution) return Outcome.HitDuringExecution;
             return hitInCommit ? Outcome.HitDuringCommit : Outcome.NotHit;
         }
 
-        /// <summary>置く数ごとの件数(実行中に被弾 / 硬直中に被弾 / 被弾なし)。各置く数 3並び×種 Seeds 通り。</summary>
+        /// <summary>直前の <see cref="Run"/> で、技が実行中に中断された(記録の interrupted)か。表の「中断」の列に使う。</summary>
+        static bool LastRunInterrupted;
+
+        /// <summary>置く数ごとの件数(実行中に被弾 / 硬直中に被弾 / 被弾なし / 置けず / 中断)。各置く数 3並び×種 Seeds 通り。</summary>
         /// <param name="onlyPoses">0 ならすべての置く数、1〜4 ならその置く数だけ。</param>
         static int[,] Measure(in Tuning tuning, bool commitEnabled, bool includeWindups = true, int onlyPoses = 0)
         {
-            var counts = new int[4, 4];
+            var counts = new int[4, 5];
             for (int n = 0; n < 4; n++)
             if (onlyPoses == 0 || onlyPoses == n + 1)
             foreach (var plan in PlansByCount[n])
             for (int seed = 1; seed <= Seeds; seed++)
+            {
                 counts[n, (int)Run(plan, seed, tuning, commitEnabled, includeWindups)]++;
+                if (LastRunInterrupted) counts[n, 4]++;
+            }
             return counts;
         }
 
         static void AppendTable(StringBuilder sb, int[,] c)
         {
-            sb.Append("置く数 | 実行中に被弾 | 硬直中に被弾 | 被弾なし | 置けず | 被弾率(実行中+硬直中)\n");
+            sb.Append("置く数 | 実行中に被弾 | 硬直中に被弾 | 被弾なし | 置けず | 中断 | 被弾率(実行中+硬直中)\n");
             for (int n = 0; n < 4; n++)
             {
                 int placed = c[n, 0] + c[n, 1] + c[n, 2];
                 float rate = placed > 0 ? 100f * (c[n, 0] + c[n, 1]) / placed : 0f;
-                sb.Append($"{n + 1} | {c[n, 0]} | {c[n, 1]} | {c[n, 2]} | {c[n, 3]} | {rate:0}%\n");
+                sb.Append($"{n + 1} | {c[n, 0]} | {c[n, 1]} | {c[n, 2]} | {c[n, 3]} | {c[n, 4]} | {rate:0}%\n");
             }
         }
 
-        /// <summary>計測用(合否なし): 既定の調整値で、置く数ごとの被弾を測る(条件A の2条件と、条件B の4個技)。</summary>
+        /// <summary>計測用(合否なし): 既定の調整値で、置く数ごとの被弾を測る(条件A・B × 予備動作中を含む・待ちのみ)。</summary>
         [Explicit("計測用: 包囲で置く数ごとの、実行中・硬直中の被弾を測る(合否なし)")]
         [Test]
         public void Measure_CommitPunishmentByPoseCount()
         {
-            var sb = new StringBuilder("[条件A・予備動作中を含む]\n");
-            AppendTable(sb, Measure(Tuning.Default, commitEnabled: true));
-            sb.Append("\n[条件A・待ちのみ]\n");
-            AppendTable(sb, Measure(Tuning.Default, commitEnabled: true, includeWindups: false));
-            sb.Append("4個技の並び別(待ちのみ): ");
+            string report = Report(Tuning.Default);
+            TestContext.WriteLine(report);
+            UnityEngine.Debug.Log("[PUNISH]\n" + report);
+            Assert.Pass(report);
+        }
+
+        /// <summary>条件A・B × 予備動作中を含む・待ちのみ の表と、条件A・待ちのみの4個技の並び別。調整値を差し替えて流せる。</summary>
+        internal static string Report(in Tuning tuning)
+        {
+            var sb = new StringBuilder();
+            foreach (bool commit in new[] { true, false })
+            foreach (bool windups in new[] { true, false })
+            {
+                sb.Append($"[条件{(commit ? "A" : "B")}・{(windups ? "予備動作中を含む" : "待ちのみ")}]\n");
+                AppendTable(sb, Measure(tuning, commit, windups));
+                sb.Append('\n');
+            }
+            sb.Append("4個技の並び別(条件A・待ちのみ): ");
             foreach (var plan in PlansByCount[3])
             {
                 int commitHits = 0;
                 for (int seed = 1; seed <= Seeds; seed++)
-                    if (Run(plan, seed, Tuning.Default, commitEnabled: true, includeWindups: false) == Outcome.HitDuringCommit) commitHits++;
+                    if (Run(plan, seed, tuning, commitEnabled: true, includeWindups: false) == Outcome.HitDuringCommit) commitHits++;
                 sb.Append($"{plan.Name} 硬直中に被弾 {commitHits}/{Seeds}  ");
             }
-            sb.Append('\n');
-            var b = Measure(Tuning.Default, commitEnabled: false, onlyPoses: 4);
-            sb.Append($"\n[条件B・予備動作中を含む] 4個技: 実行中に被弾 {b[3, 0]} / 硬直中に被弾 {b[3, 1]} / 被弾なし {b[3, 2]}\n");
-            TestContext.WriteLine(sb.ToString());
-            UnityEngine.Debug.Log("[PUNISH]\n" + sb);
-            Assert.Pass(sb.ToString());
+            return sb.ToString();
         }
 
         /// <summary>

@@ -69,7 +69,7 @@ namespace CutKungfu.Tests
             public override string ToString() => Name;
         }
 
-        static readonly SurroundSetup[] Setups =
+        internal static readonly SurroundSetup[] Setups =
         {
             // 机(x 1.8〜4.2, z 0.2〜1.4)の左脇。机上の着地の範囲(半径2.0)に3体とも入る
             new SurroundSetup { Name = "机の左脇", Player = new float3(1.2f, 0f, 0.8f), EnemyAngles = new[] { 90f, 210f, 330f } },
@@ -94,14 +94,23 @@ namespace CutKungfu.Tests
         [TestCaseSource(nameof(MixedCases))]
         public void MixedAreaCombos_CannotWipeTheSurround(SurroundSetup setup, float gauge)
         {
+            var wipes = MixedAreaWipes(setup, gauge, Tuning.Default, out int runs);
+            TestContext.WriteLine($"{setup.Name} ゲージ{gauge}: {runs} 通り流して全滅 {wipes.Count} 通り");
+            Assert.That(runs, Is.GreaterThan(0));
+            Assert.That(wipes, Is.Empty, $"{setup.Name}・ゲージ{gauge}で、1回の技で包囲を全滅できる組み合わせ:\n" + string.Join("\n", wipes));
+        }
+
+        /// <summary>MixedAreaCombos の本体。全滅できた並びを返す(調整値を差し替えて流せるように分けてある)。</summary>
+        internal static List<string> MixedAreaWipes(SurroundSetup setup, float gauge, Tuning tuning, out int runs)
+        {
             var table = GameplayTestWorld.StageTable;
-            int affordable = CutRules.AffordablePoses(Tuning.Default, gauge - Tuning.Default.SlowFixedCost, 0);
+            int affordable = CutRules.AffordablePoses(tuning, gauge - tuning.SlowFixedCost, 0);
             var wipes = new List<string>();
-            int runs = 0;
+            runs = 0;
 
             foreach (var seq in Sequences(new[] { S, T, F }, 2, affordable))
             {
-                using var w = SurroundedAt(setup);
+                using var w = SurroundedAt(setup, tuning);
                 w.AddTable(table);
                 w.Step();
                 w.SetGauge(gauge);
@@ -120,9 +129,7 @@ namespace CutKungfu.Tests
                 wipes.Add($"{placed} (残り体力 {hp.ToString().Trim()})");
             }
 
-            TestContext.WriteLine($"{setup.Name} ゲージ{gauge}: {runs} 通り流して全滅 {wipes.Count} 通り");
-            Assert.That(runs, Is.GreaterThan(0));
-            Assert.That(wipes, Is.Empty, $"{setup.Name}・ゲージ{gauge}で、1回の技で包囲を全滅できる組み合わせ:\n" + string.Join("\n", wipes));
+            return wipes;
         }
 
         static IEnumerable<TestCaseData> PalmMixedCases()
@@ -141,11 +148,20 @@ namespace CutKungfu.Tests
         [TestCaseSource(nameof(PalmMixedCases))]
         public void AreaThenPalmFinish_CannotWipeTheSurround(SurroundSetup setup, float gauge)
         {
+            var wipes = AreaThenPalmWipes(setup, gauge, Tuning.Default, out int runs, out string summary);
+            TestContext.WriteLine(summary);
+            Assert.That(runs, Is.GreaterThan(0));
+            Assert.That(wipes, Is.Empty, "1回の技で包囲を全滅できる並び:\n" + summary);
+        }
+
+        /// <summary>AreaThenPalmFinish の本体。全滅できた並びと、生き残りの内訳の要約を返す(調整値を差し替えて流せるように分けてある)。</summary>
+        internal static List<string> AreaThenPalmWipes(SurroundSetup setup, float gauge, Tuning tuning, out int runs, out string summary)
+        {
             var table = GameplayTestWorld.StageTable;
-            int affordable = CutRules.AffordablePoses(Tuning.Default, gauge - Tuning.Default.SlowFixedCost, 0);
+            int affordable = CutRules.AffordablePoses(tuning, gauge - tuning.SlowFixedCost, 0);
             var wipes = new List<string>();
             var survivors = new int[4];
-            int runs = 0;
+            runs = 0;
             float minRemainingWhenNotWiped = float.MaxValue;
 
             foreach (var seq in Sequences(new[] { S, T, F, P }, 2, affordable))
@@ -154,7 +170,7 @@ namespace CutKungfu.Tests
                 foreach (var k in seq) { hasPalm |= k == P; hasArea |= CutRules.IsAreaBrick(k); }
                 if (!hasPalm || !hasArea) continue;
 
-                using var w = SurroundedAt(setup);
+                using var w = SurroundedAt(setup, tuning);
                 w.AddTable(table);
                 w.Step();
                 w.SetGauge(gauge);
@@ -180,12 +196,10 @@ namespace CutKungfu.Tests
                 else minRemainingWhenNotWiped = math.min(minRemainingWhenNotWiped, remaining);
             }
 
-            string summary = $"{setup.Name} ゲージ{gauge}: {runs} 通り / 生存0体 {survivors[0]}・1体 {survivors[1]}・2体 {survivors[2]}・3体 {survivors[3]}"
+            summary = $"{setup.Name} ゲージ{gauge}: {runs} 通り / 生存0体 {survivors[0]}・1体 {survivors[1]}・2体 {survivors[2]}・3体 {survivors[3]}"
                              + (runs > survivors[0] ? $" / 全滅しなかった中で残り体力の合計の最小 {minRemainingWhenNotWiped:0.0}" : "")
                              + (wipes.Count > 0 ? "\n全滅:\n" + string.Join("\n", wipes) : "");
-            TestContext.WriteLine(summary);
-            Assert.That(runs, Is.GreaterThan(0));
-            Assert.That(wipes, Is.Empty, "1回の技で包囲を全滅できる並び:\n" + summary);
+            return wipes;
         }
 
         /// <summary>範囲技1発+単体技3発で全滅できる既知の5通り(AreaThenPalmFinish_CannotWipeTheSurround の Ignore 2ケース)。</summary>
@@ -440,6 +454,15 @@ namespace CutKungfu.Tests
         }
 
         static GameplayTestWorld SurroundedAt(SurroundSetup setup) => new GameplayTestWorld(setup.Player, EnemySpawns(setup));
+
+        static GameplayTestWorld SurroundedAt(SurroundSetup setup, in Tuning tuning)
+        {
+            var w = SurroundedAt(setup);
+            var ts = w.Singleton<TuningSingleton>();
+            ts.Value = tuning;
+            w.SetSingleton(ts);
+            return w;
+        }
 
         static float3[] EnemySpawns(SurroundSetup setup)
         {
